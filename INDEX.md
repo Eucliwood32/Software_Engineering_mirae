@@ -1,8 +1,8 @@
-# QCE 문서 인덱스 (Documentation Index) 📑
+# QCE 문서 인덱스 (Documentation Index)
 
 본 디렉토리는 QCE(부탁해 꼬마선장) 프로젝트의 연구, 요구사항 명세, 설계, 테스트 및 의사결정 내역을 관리하는 공간입니다. **???** 표준을 기반으로 작성되었습니다.
 
-## 📁 디렉토리 구조 및 내용
+## 디렉토리 구조 및 내용
 
 ### `00-research-analysis/` (연구 및 분석)
 - `problem-statement.md`: 문제 정의 및 프로젝트 추진 배경
@@ -38,7 +38,7 @@
 
 ---
 
-## 📌 기여자 가이드 (Contributor Guidelines)
+## 기여자 가이드 (Contributor Guidelines)
 
 문서화 및 코드 작성 시 아래의 원칙을 반드시 준수해야 합니다.
 
