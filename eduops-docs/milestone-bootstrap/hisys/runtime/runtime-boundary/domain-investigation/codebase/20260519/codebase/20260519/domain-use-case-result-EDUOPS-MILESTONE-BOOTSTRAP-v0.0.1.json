@@ -1,0 +1,53 @@
+{
+  "artifact_refs": {
+    "aggregation_report_ref": "runtime-boundary/domain-investigation/codebase/20260519/aggregation-report-EDUOPS-MILESTONE-BOOTSTRAP-v0.0.1.md",
+    "decision_ref": "runtime-boundary/dars/20260519/dars-decision-EDUOPS-MILESTONE-BOOTSTRAP-v0.0.1.json",
+    "evidence_refs": [
+      "eduops-local-repo",
+      "requirements-folder:///home/cbchoi/me/requirements"
+    ],
+    "investigation_ref": "INVEST-EDUOPS-MILESTONE-BOOTSTRAP-v0.0.1-CODE",
+    "memo_refs": [
+      "memo://EDUOPS-MILESTONE-BOOTSTRAP-v0.0.1/local-code-and-requirements-memos"
+    ],
+    "runtime_boundary_refs": []
+  },
+  "config_snapshot_refs": [],
+  "domain": "codebase",
+  "domain_subtype": null,
+  "external_call_made": false,
+  "governance_flags": {},
+  "layer_trace": [
+    {
+      "component": "CodeInvestigationLayer",
+      "layer": "investigation",
+      "output_ref": "INVEST-EDUOPS-MILESTONE-BOOTSTRAP-v0.0.1-CODE"
+    },
+    {
+      "component": "MemoReportAggregationLayer",
+      "layer": "aggregation",
+      "output_ref": "runtime-boundary/domain-investigation/codebase/20260519/aggregation-report-EDUOPS-MILESTONE-BOOTSTRAP-v0.0.1.md"
+    },
+    {
+      "component": "DarsDecisionLayer",
+      "layer": "decision",
+      "output_ref": "runtime-boundary/dars/20260519/dars-decision-EDUOPS-MILESTONE-BOOTSTRAP-v0.0.1.json"
+    }
+  ],
+  "mutation_performed": false,
+  "prompt_bundle_refs": [],
+  "quality_gate": "needs_more_evidence",
+  "recommendation_summary": "human_review_required",
+  "request_id": "EDUOPS-MILESTONE-BOOTSTRAP-v0.0.1",
+  "requires_human_review": true,
+  "traceability_ids": [
+    "HISYS-FR-DOM-001",
+    "HISYS-FR-DOM-002",
+    "HISYS-FR-DOM-003",
+    "HISYS-FR-DOM-004",
+    "HISYS-FR-DOM-005",
+    "HISYS-T-025",
+    "HISYS-T-026",
+    "HISYS-T-027"
+  ]
+}

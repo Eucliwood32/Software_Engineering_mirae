@@ -1,0 +1,20 @@
+{
+  "advisory_only": true,
+  "decision_engine": "DARS",
+  "decision_type": "code_evaluation_review",
+  "external_call_made": false,
+  "input_report_ref": "runtime-boundary/domain-investigation/codebase/20260519/aggregation-report-EDUOPS-MILESTONE-BOOTSTRAP-v0.0.1.md",
+  "mutation_performed": false,
+  "policy_refs": [
+    "HISYS-FR-AGT-001",
+    "HISYS-FR-AGT-003",
+    "HISYS-CON-010",
+    "HISYS-CON-012"
+  ],
+  "recommendation": "human_review_required",
+  "request_id": "EDUOPS-MILESTONE-BOOTSTRAP-v0.0.1",
+  "requires_human_review": true,
+  "schema_id": "hisys.domain.dars_decision_placeholder",
+  "schema_version": "0.1.0",
+  "status": "pending_human_review"
+}

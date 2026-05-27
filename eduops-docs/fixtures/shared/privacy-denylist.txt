@@ -1,0 +1,6 @@
+real.student@example.com
+010-0000-0000
+actual-github-handle
+live-token
+ghp_
+github_pat_

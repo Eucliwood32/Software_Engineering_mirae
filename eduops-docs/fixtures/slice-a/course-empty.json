@@ -1,0 +1,11 @@
+{
+  "assignments": [],
+  "course_code": "EDUOPS101-FIXTURE",
+  "course_id": "COURSE-FIXTURE-EMPTY",
+  "created_at": "2026-05-14T00:00:00Z",
+  "schema_version": "1.0.0",
+  "sections": [],
+  "students": [],
+  "term": "2026S-FIXTURE",
+  "title": "Empty Fixture Course"
+}

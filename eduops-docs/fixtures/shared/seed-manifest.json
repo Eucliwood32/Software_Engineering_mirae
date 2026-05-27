@@ -1,0 +1,8 @@
+{
+  "clock_utc": "2026-05-14T00:00:00Z",
+  "fixture_profile": "eduops-local-alpha",
+  "random_seed": "eduops-slice-a-seed-0001",
+  "schema_version": "1.0.0",
+  "synthetic_only": true,
+  "timezone": "Asia/Seoul"
+}

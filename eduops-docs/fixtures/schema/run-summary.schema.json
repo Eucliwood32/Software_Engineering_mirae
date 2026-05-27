@@ -1,0 +1,63 @@
+{
+  "$id": "https://sysailab.local/eduops/run-summary.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "adapter_mode": {
+      "type": "string"
+    },
+    "artifacts": {
+      "items": {
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^[a-f0-9]{64}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "sha256"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "checks": {
+      "type": "object"
+    },
+    "command": {
+      "type": "string"
+    },
+    "gate_id": {
+      "type": "string"
+    },
+    "live_external_action": {
+      "const": false
+    },
+    "status": {
+      "enum": [
+        "red_expected_failure",
+        "green_pass",
+        "fail"
+      ]
+    },
+    "timestamp_utc": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "gate_id",
+    "command",
+    "status",
+    "timestamp_utc",
+    "adapter_mode",
+    "live_external_action",
+    "artifacts",
+    "checks"
+  ],
+  "title": "EduOps Fixture Run Summary",
+  "type": "object"
+}

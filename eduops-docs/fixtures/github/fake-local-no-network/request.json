@@ -1,0 +1,10 @@
+{
+  "adapter_mode": "fake-local",
+  "credential_ref_id": null,
+  "github_mutation_made": false,
+  "live_external_action": false,
+  "network_allowed": false,
+  "operation": "github.validateCloneConfiguration",
+  "operation_class": "clone-only",
+  "schema_version": "1.0.0"
+}

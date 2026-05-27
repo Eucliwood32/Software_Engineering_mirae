@@ -1,0 +1,26 @@
+target_working_directory: /home/cbchoi/workspaces/develop/repos/eduops
+detected_profile: develop
+selected_profile: develop
+profile_selection_reason: Discord thread context is EduOps develop repository management;
+  repository contains Cargo/Node source tree, tests, fixtures, controlled docs, and
+  ralph.md execution plan.
+bootstrap_version: v0.0.1
+previous_bootstrap_version: null
+git_repository: true
+branch: main
+remote_present: true
+remote_action_authorized: false
+artifact_root: docs/milestone-bootstrap
+created: '2026-05-19'
+safety_boundary:
+  local_file_mutation_allowed: true
+  local_git_commit_allowed_after_validation: true
+  remote_push_allowed: false
+  live_external_action_allowed: false
+  credential_mutation_allowed: false
+  destructive_git_allowed: false
+source_summary:
+  markdown_files: 130
+  rust_files: 61
+  json_files: 144
+  missing_key_docs: []

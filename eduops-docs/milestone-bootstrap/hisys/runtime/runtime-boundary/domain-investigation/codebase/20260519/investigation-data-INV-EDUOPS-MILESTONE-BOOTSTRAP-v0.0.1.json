@@ -1,0 +1,50 @@
+{
+  "claim_coverage_gate_refs": [],
+  "claim_evidence_ledger_refs": [],
+  "claim_evidence_summary_refs": [],
+  "domain": "codebase",
+  "evidence_chain": null,
+  "evidence_packages": [
+    {
+      "claims": [
+        "human_review_required"
+      ],
+      "domain": "codebase",
+      "evidence_refs": [
+        "eduops-local-repo",
+        "requirements-folder:///home/cbchoi/me/requirements",
+        "INVEST-EDUOPS-MILESTONE-BOOTSTRAP-v0.0.1-CODE"
+      ],
+      "evidence_type": "codebase_structured_evidence",
+      "external_call_made": false,
+      "limitations": [
+        "Structured adapter bridge uses governed local artifacts only."
+      ],
+      "mutation_performed": false,
+      "open_questions": [],
+      "package_id": "DEPKG-EDUOPS-MILESTONE-BOOTSTRAP-v0.0.1",
+      "source_refs": [
+        "eduops-local-repo"
+      ],
+      "summary": "Structured codebase investigation packet."
+    }
+  ],
+  "hisys_mode": {
+    "applies_to_all_notes": false,
+    "level": "stone",
+    "routing_policy_ref": null,
+    "selective_governance": true,
+    "upgrade_triggers": []
+  },
+  "investigation_id": "INV-EDUOPS-MILESTONE-BOOTSTRAP-v0.0.1",
+  "objective": "Assess whether the local EduOps develop repository has enough controlled evidence for a governed milestone-bootstrap and local Ralph/TDD handoff without live external action.",
+  "promoted_pdf_evidence_refs": [],
+  "recommendation_claim_registry_refs": [],
+  "request_id": "EDUOPS-MILESTONE-BOOTSTRAP-v0.0.1",
+  "runtime_boundary_refs": [
+    "runtime-boundary/domain-investigation/codebase/20260519/codebase/20260519/domain-use-case-result-EDUOPS-MILESTONE-BOOTSTRAP-v0.0.1.json",
+    "runtime-boundary/domain-investigation/codebase/20260519/codebase/20260519/domain-use-case-result-EDUOPS-MILESTONE-BOOTSTRAP-v0.0.1.md"
+  ],
+  "source_governance_refs": [],
+  "source_quote_refs": []
+}

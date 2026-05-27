@@ -1,0 +1,167 @@
+{
+  "request_id": "REQ-EDUOPS-FULL-SOURCE-INSPECTION-20260514-001",
+  "repo": "/home/cbchoi/workspaces/sysailab/develop/repos/eduops",
+  "status": "## main\n09277ed docs: add hisys codebase analysis\n29a059b docs: add eduops demonstration usage scenarios\nb064cec docs: close demo UI readiness findings\nd78df2c docs: validate demo UI readiness gate\nf986e7d docs: add demo UI readiness gate",
+  "file_count": 98,
+  "by_suffix": {
+    "<none>": {
+      "files": 4,
+      "lines": 75
+    },
+    ".md": {
+      "files": 86,
+      "lines": 10691
+    },
+    ".json": {
+      "files": 7,
+      "lines": 134
+    },
+    ".txt": {
+      "files": 1,
+      "lines": 7
+    }
+  },
+  "source_file_count_outside_docs": 0,
+  "source_files_outside_docs": [],
+  "required_path_existence": {
+    "Cargo.toml": false,
+    "Cargo.lock": false,
+    "rust-toolchain.toml": false,
+    "package.json": false,
+    "pnpm-lock.yaml": false,
+    "apps/desktop": false,
+    "apps/desktop-ui": false,
+    "crates/eduops_domain": false,
+    "crates/eduops_api": false,
+    "crates/eduops_core": false,
+    "crates/eduops_storage": false,
+    "crates/eduops_git": false,
+    "crates/eduops_fixture": false,
+    "docs/06-implementation/implementation-milestones.md": true,
+    "docs/03-verification-validation/demonstration-usage-scenarios.md": true,
+    "docs/03-verification-validation/ui-shell-demo-test-cards.md": true,
+    "docs/03-verification-validation/working-demonstration-evidence-plan.md": true,
+    "docs/02-design-planning/module-and-package-layout.md": true,
+    "docs/02-design-planning/process-topology-and-ipc-contract.md": true,
+    "docs/00-research-analysis/hisys-codebase-analysis.md": true
+  },
+  "missing_m0_paths": [
+    "Cargo.toml",
+    "rust-toolchain.toml",
+    "package.json",
+    "apps/desktop",
+    "apps/desktop-ui",
+    "crates/eduops_domain",
+    "crates/eduops_api",
+    "crates/eduops_core",
+    "crates/eduops_storage",
+    "crates/eduops_git",
+    "crates/eduops_fixture"
+  ],
+  "markdown_files": 89,
+  "json_files": 7,
+  "bad_local_links": [],
+  "json_parse_errors": [],
+  "content_term_results": [
+    {
+      "path": "docs/06-implementation/implementation-milestones.md",
+      "term": "M0 — Repository scaffold",
+      "present": true
+    },
+    {
+      "path": "docs/06-implementation/implementation-milestones.md",
+      "term": "M1A — Desktop shell demonstration slice",
+      "present": true
+    },
+    {
+      "path": "docs/06-implementation/implementation-milestones.md",
+      "term": "build/evidence/ui-shell-slice-a/<run-id>",
+      "present": true
+    },
+    {
+      "path": "docs/06-implementation/implementation-milestones.md",
+      "term": "live_external_action=false",
+      "present": true
+    },
+    {
+      "path": "docs/03-verification-validation/demonstration-usage-scenarios.md",
+      "term": "SCN-M1A-001",
+      "present": true
+    },
+    {
+      "path": "docs/03-verification-validation/demonstration-usage-scenarios.md",
+      "term": "SCN-DEMO1-001",
+      "present": true
+    },
+    {
+      "path": "docs/03-verification-validation/demonstration-usage-scenarios.md",
+      "term": "ResultEnvelope",
+      "present": true
+    },
+    {
+      "path": "docs/03-verification-validation/demonstration-usage-scenarios.md",
+      "term": "build/evidence/ui-shell-slice-a/<run-id>",
+      "present": true
+    },
+    {
+      "path": "docs/03-verification-validation/ui-shell-demo-test-cards.md",
+      "term": "TC-UI-SHELL-001",
+      "present": true
+    },
+    {
+      "path": "docs/03-verification-validation/ui-shell-demo-test-cards.md",
+      "term": "TC-UI-SHELL-002",
+      "present": true
+    },
+    {
+      "path": "docs/03-verification-validation/ui-shell-demo-test-cards.md",
+      "term": "TC-UI-SHELL-003",
+      "present": true
+    },
+    {
+      "path": "docs/03-verification-validation/ui-shell-demo-test-cards.md",
+      "term": "GATE-UI-SHELL-DEMO-SLICE-A",
+      "present": true
+    },
+    {
+      "path": "docs/02-design-planning/module-and-package-layout.md",
+      "term": "apps/desktop",
+      "present": true
+    },
+    {
+      "path": "docs/02-design-planning/module-and-package-layout.md",
+      "term": "apps/desktop-ui",
+      "present": true
+    },
+    {
+      "path": "docs/02-design-planning/module-and-package-layout.md",
+      "term": "eduops_desktop",
+      "present": true
+    }
+  ],
+  "commands": [
+    {
+      "name": "git_diff_check",
+      "command": "git diff --check",
+      "exit_code": 0,
+      "output_tail": ""
+    },
+    {
+      "name": "cargo_check_workspace",
+      "command": "cargo check --workspace",
+      "exit_code": null,
+      "skipped_reason": "prerequisite_missing"
+    },
+    {
+      "name": "pnpm_typecheck",
+      "command": "pnpm --dir apps/desktop-ui typecheck",
+      "exit_code": null,
+      "skipped_reason": "prerequisite_missing"
+    }
+  ],
+  "decision": "NO_GO_FOR_EXECUTABLE_UI_DEMO",
+  "external_call_made": false,
+  "mutation_performed": false,
+  "publication_or_live_action_approved": false,
+  "summary": "Repository is a controlled documentation baseline; full source inspection found no executable product source yet, so M0 scaffold is the required next increment."
+}

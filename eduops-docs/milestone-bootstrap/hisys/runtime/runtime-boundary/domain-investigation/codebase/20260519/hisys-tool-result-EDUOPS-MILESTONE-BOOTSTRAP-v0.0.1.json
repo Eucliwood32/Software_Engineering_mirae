@@ -1,0 +1,18 @@
+{
+  "domain": "codebase",
+  "external_call_made": false,
+  "mutation_performed": false,
+  "quality_gate": "needs_more_evidence",
+  "recommended_alternative_id": "CAND-EDUOPS-MILESTONE-BOOTSTRAP-v0.0.1",
+  "requires_human_review": true,
+  "runtime_boundary_refs": [
+    "runtime-boundary/domain-investigation/codebase/20260519/codebase/20260519/domain-use-case-result-EDUOPS-MILESTONE-BOOTSTRAP-v0.0.1.json",
+    "runtime-boundary/domain-investigation/codebase/20260519/codebase/20260519/domain-use-case-result-EDUOPS-MILESTONE-BOOTSTRAP-v0.0.1.md",
+    "runtime-boundary/domain-investigation/codebase/20260519/investigation-data-INV-EDUOPS-MILESTONE-BOOTSTRAP-v0.0.1.json",
+    "runtime-boundary/domain-investigation/codebase/20260519/alternative-decision-set-ALT-EDUOPS-MILESTONE-BOOTSTRAP-v0.0.1.json",
+    "runtime-boundary/domain-investigation/codebase/20260519/domain-investigation-result-RESULT-EDUOPS-MILESTONE-BOOTSTRAP-v0.0.1.json",
+    "runtime-boundary/domain-investigation/codebase/20260519/hisys-tool-result-EDUOPS-MILESTONE-BOOTSTRAP-v0.0.1.json"
+  ],
+  "status": "needs_more_evidence",
+  "summary": "human_review_required"
+}

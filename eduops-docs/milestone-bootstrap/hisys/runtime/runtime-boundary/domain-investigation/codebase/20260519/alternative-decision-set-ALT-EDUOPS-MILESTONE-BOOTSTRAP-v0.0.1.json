@@ -1,0 +1,28 @@
+{
+  "alternative_set_id": "ALT-EDUOPS-MILESTONE-BOOTSTRAP-v0.0.1",
+  "baseline_option": "request_more_evidence",
+  "candidates": [
+    {
+      "candidate_id": "CAND-EDUOPS-MILESTONE-BOOTSTRAP-v0.0.1",
+      "candidate_type": "codebase_advisory_candidate",
+      "claim": "human_review_required",
+      "costs": [],
+      "evidence_refs": [
+        "eduops-local-repo",
+        "requirements-folder:///home/cbchoi/me/requirements",
+        "runtime-boundary/domain-investigation/codebase/20260519/aggregation-report-EDUOPS-MILESTONE-BOOTSTRAP-v0.0.1.md",
+        "runtime-boundary/dars/20260519/dars-decision-EDUOPS-MILESTONE-BOOTSTRAP-v0.0.1.json"
+      ],
+      "next_increment": "human_review",
+      "risks": [
+        "Advisory result only; human review required."
+      ],
+      "uncertainties": [
+        "More evidence may be required."
+      ],
+      "value": "Preserve structured three-layer analysis for human review."
+    }
+  ],
+  "recommended_candidate_id": "CAND-EDUOPS-MILESTONE-BOOTSTRAP-v0.0.1",
+  "request_id": "EDUOPS-MILESTONE-BOOTSTRAP-v0.0.1"
+}
