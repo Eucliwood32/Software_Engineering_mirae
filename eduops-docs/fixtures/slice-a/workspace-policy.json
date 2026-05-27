@@ -1,8 +1,0 @@
-{
-  "adapter_mode": "fake-local",
-  "allow_network": false,
-  "allow_remote_git": false,
-  "live_external_action": false,
-  "schema_version": "1.0.0",
-  "workspace_root": "$EDUOPS_FIXTURE_WORKDIR/workspace"
-}
