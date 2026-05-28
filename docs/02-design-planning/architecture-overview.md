@@ -3,7 +3,7 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 문서 버전 | v1.0 |
+| 문서 버전 | v1.1 |
 | 작성일 | 2026-05-28 |
 | 준수 표준 | ISO/IEC/IEEE 29148-2018, ISO/IEC/IEEE 42010 (아키텍처 기술) |
 | 상위 문서 | SRS v2.2, Requirements Record v1.3, Concept of Operations v1.2, Development Constraints v2.0 |
@@ -55,7 +55,7 @@ flowchart TD
     subgraph View["View 레이어 [이대한]"]
         V[MainWindow · Dialogs · Charts · Panels]
     end
-    subgraph Controller["Controller 레이어 [공동]"]
+    subgraph Controller["Controller 레이어 [김휘중]"]
         C[AppController · AnalysisOrchestrator]
     end
     subgraph Model["Model 레이어 [조원희 · 김휘중]"]
@@ -112,7 +112,7 @@ flowchart LR
         end
     end
 
-    subgraph C["Controller [공동]"]
+    subgraph C["Controller [김휘중]"]
         AC[AppController]
         AO[AnalysisOrchestrator]
     end
@@ -168,8 +168,8 @@ flowchart LR
 | WarningBanner | View | 이대한 | 결측 경고 배너 | FR-5.3 |
 | ProgressBar | View | 이대한 | 진행률 표시 | NFR-1.1 |
 | SaveReportDialog | View | 이대한 | 저장 경로·형식 선택 | FR-5.2 |
-| AppController | Controller | 공동 | 이벤트 라우팅, V↔M 중재 | (전역) |
-| AnalysisOrchestrator | Controller | 공동 | is_analyzing 가드, Worker 수명, 모듈 통합 | NFR-1.2, NFR-3.2 |
+| AppController | Controller | 김휘중 | 이벤트 라우팅, V↔M 중재 | (전역) |
+| AnalysisOrchestrator | Controller | 김휘중 | is_analyzing 가드, Worker 수명, 모듈 통합 | NFR-1.2, NFR-3.2 |
 | DocumentParser | Model·Parse | 조원희 | 문서 파사드(.pptx/.docx/.hwpx)·작성자 집계 | FR-1.1, FR-1.2 |
 | GitAnalyzer | Model·Parse | 조원희 | git log 수집 | FR-2.1 |
 | GitHealthChecker | Model·Parse | 조원희 | git --version 점검 | FR-2.2 |
@@ -346,7 +346,7 @@ class ReportExporter:                   # FR-5.2, FR-5.3
         """utf-8-sig(BOM)로 인코딩."""
 ```
 
-### 5.4 Controller 레이어 [공동]
+### 5.4 Controller 레이어 [김휘중]
 
 ```python
 class AnalysisOrchestrator(QObject):    # NFR-1.2, NFR-3.2
@@ -513,3 +513,4 @@ stateDiagram-v2
 | 버전 | 일자 | 변경 | 작성자 |
 | :--- | :--- | :--- | :--- |
 | v1.0 | 2026-05-28 | 최초 작성. RR v1.3·ConOps v1.2·dev-constraints v2.0 기준 9장 구성. DocumentParser 파사드(.hwpx 반영), 카톡 전용 MessengerParser·자동 StopwordFilter(FR-3.1/3.3 반영), AnomalySignalDetector 분리(판정 금지), 차트 BaseChartWidget 상속 구조, 핵심 인터페이스 시그니처, 동시성·데이터 흐름·캐시 다이어그램, 아키텍처 RTM 포함 | QCE 개발팀 |
+| **v1.1** | **2026-05-28** | **MVC 구현 책임 배정 명확화: Controller 레이어 담당을 "공동" → **김휘중** 단독으로 변경(§3.1 레이어 다이어그램, §4.1 컴포넌트 다이어그램, §4.2 컴포넌트 책임 표의 AppController·AnalysisOrchestrator, §5.4 절 제목). View 레이어(이대한), Model 레이어(조원희 · 김휘중 공동)는 기존과 동일하게 유지. 인터페이스 시그니처·다이어그램 구조 등 그 외 내용 변경 없음.** | QCE 개발팀 |
