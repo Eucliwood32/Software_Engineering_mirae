@@ -1,0 +1,132 @@
+"""
+AnalysisPanel — 가중치 프리셋·슬라이더·합계 검증 표시 (view-design §6.5, FR-4.4).
+
+프리셋 버튼 3개 + 슬라이더 3개(0.00~1.00, step 0.05) + 합계 라벨 + [분석 시작].
+
+합계==1.0 판정 로직은 Model(WeightPresetManager)의 책임이다(§6.5). 본 패널은
+슬라이더 변경 시 weights_changed를 발행하고, Controller가 검증 결과를
+set_analyze_enabled/set_weight_warning으로 되돌려준다. View는 합계 계산 로직을
+보유하지 않는다(합계 라벨은 단순 표시용).
+"""
+from __future__ import annotations
+
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QSlider,
+    QVBoxLayout,
+    QWidget,
+)
+
+_STEP = 0.05
+_TICKS = 20  # 0.00~1.00을 0.05 단위 → 21 포지션(0..20)
+
+
+class AnalysisPanel(QWidget):
+    weights_changed = pyqtSignal(dict)
+    preset_chosen = pyqtSignal(str)
+    analyze_clicked = pyqtSignal()
+
+    PRESETS: dict[str, tuple[float, float, float]] = {
+        "개발 중심": (0.60, 0.25, 0.15),
+        "기획 중심": (0.20, 0.60, 0.20),
+        "균형 설정": (0.40, 0.40, 0.20),
+    }
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        root = QVBoxLayout(self)
+
+        # 프리셋 버튼
+        preset_row = QHBoxLayout()
+        for name in self.PRESETS:
+            btn = QPushButton(name)
+            btn.clicked.connect(lambda _checked=False, n=name: self.apply_preset(n))
+            preset_row.addWidget(btn)
+        root.addLayout(preset_row)
+
+        # 슬라이더 3개 (git/doc/msg)
+        self._sliders: dict[str, QSlider] = {}
+        for key, label in (("w_git", "Git"), ("w_doc", "문서"), ("w_msg", "메신저")):
+            row = QHBoxLayout()
+            row.addWidget(QLabel(label))
+            s = QSlider(Qt.Orientation.Horizontal)
+            s.setRange(0, _TICKS)
+            s.setSingleStep(1)
+            s.setPageStep(1)
+            s.valueChanged.connect(self._on_slider_changed)
+            self._sliders[key] = s
+            row.addWidget(s)
+            root.addLayout(row)
+
+        self._sum_label = QLabel("")
+        root.addWidget(self._sum_label)
+
+        self._warning_label = QLabel("")
+        self._warning_label.setObjectName("weightWarning")
+        self._warning_label.setVisible(False)
+        root.addWidget(self._warning_label)
+
+        self._analyze_btn = QPushButton("분석 시작")
+        self._analyze_btn.setObjectName("primary")
+        self._analyze_btn.clicked.connect(self.analyze_clicked.emit)
+        root.addWidget(self._analyze_btn)
+
+        self._refresh_sum_label()
+
+    # ------------------------------------------------------------------ #
+    # 공개 API
+    # ------------------------------------------------------------------ #
+    def apply_preset(self, name: str) -> None:
+        w_git, w_doc, w_msg = self.PRESETS[name]
+        self._set_silently("w_git", w_git)
+        self._set_silently("w_doc", w_doc)
+        self._set_silently("w_msg", w_msg)
+        self._refresh_sum_label()
+        self.preset_chosen.emit(name)
+        self.weights_changed.emit(self.current_weights())
+
+    def current_weights(self) -> dict[str, float]:
+        return {key: round(s.value() * _STEP, 2) for key, s in self._sliders.items()}
+
+    def set_analyze_enabled(self, enabled: bool) -> None:
+        self._analyze_btn.setEnabled(enabled)
+
+    def set_weight_warning(self, msg: str | None) -> None:
+        """msg=None이면 경고 해제."""
+        if msg is None:
+            self._warning_label.setText("")
+            self._warning_label.setVisible(False)
+        else:
+            self._warning_label.setText(msg)
+            self._warning_label.setVisible(True)
+
+    # ------------------------------------------------------------------ #
+    # 내부
+    # ------------------------------------------------------------------ #
+    def _set_silently(self, key: str, value: float) -> None:
+        s = self._sliders[key]
+        s.blockSignals(True)
+        s.setValue(int(round(value / _STEP)))
+        s.blockSignals(False)
+
+    def _on_slider_changed(self, _value: int) -> None:
+        self._refresh_sum_label()
+        self.weights_changed.emit(self.current_weights())
+
+    def _refresh_sum_label(self) -> None:
+        total = sum(self.current_weights().values())
+        self._sum_label.setText(f"합계: {total:.2f}")
+
+    # --- 테스트 접근자 ---
+    def analyze_enabled(self) -> bool:
+        return self._analyze_btn.isEnabled()
+
+    def weight_warning_text(self) -> str:
+        return self._warning_label.text()
+
+    @property
+    def weight_step(self) -> float:
+        return _STEP

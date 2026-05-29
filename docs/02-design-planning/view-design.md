@@ -208,10 +208,10 @@ Controller가 push하는 dict는 아래 키·타입을 정확히 만족한다. V
 | `msg_score` | `float` 0.0~1.0 | 메신저 정규화 점수 |
 | `total_score` | `float` 0.0~1.0 | 종합 기여 지표 |
 | `raw_additions` | `int` | Git 원시 추가 라인 |
-| `raw_char_count` | `int` | 문서 원시 글자수 |
-| `raw_msg_count` | `int` | 메신저 원시 발화 수 |
+| `raw_chars` | `int` | 문서 원시 글자수 |
+| `raw_messages` | `int` | 메신저 원시 발화 수 |
 | `capping_applied` | `bool` | Capping 발동 여부 |
-| `anomaly_flags` | `list[str]` | 예: `["EW-01","ZSCORE"]` (산점도 강조용) |
+| `signals` | `list[str]` | 예: `["EW-01","ZSCORE"]` (산점도 강조용) |
 
 **식별자 dict** (`AliasMappingDialog.populate`의 원소, FR-1.3)
 
@@ -231,10 +231,10 @@ K_DOC      = "doc_score"
 K_MSG      = "msg_score"
 K_TOTAL    = "total_score"
 K_RAW_ADD  = "raw_additions"
-K_RAW_CHAR = "raw_char_count"
-K_RAW_MSG  = "raw_msg_count"
+K_RAW_CHAR = "raw_chars"
+K_RAW_MSG  = "raw_messages"
 K_CAPPING  = "capping_applied"
-K_ANOMALY  = "anomaly_flags"
+K_ANOMALY  = "signals"
 # 식별자 dict 키
 K_RAW_ID   = "raw_id"
 K_SOURCE   = "source"
@@ -619,3 +619,4 @@ GRID_STEP          = 0.2
 | :--- | :--- | :--- | :--- |
 | v1.0 | 2026-05-29 | 최초 작성. architecture-overview v1.0 하위 문서로서 View 12 컴포넌트 1파일=1위젯 분해(~2,500 LOC 예산), View↔Controller Signal/슬롯 계약 카탈로그, 차트 3종 애니메이션·툴팁·연동 상세, MemberScore 흐름(Controller 중재 push + common/dto 타입 참조), 차트간 Signal 중재(결정 B), 테스트 접근자 공개(결정 C), 메인스레드 애니메이션 타이머(결정 D), UI 상태 전이, FR-5.1d 12 pytest 매핑, View RTM 포함 | QCE 개발팀 (이대한) |
 | **v1.1** | **2026-05-29** | **결정 A를 엄격 격리로 변경: View는 `MemberScore` 등 내부 타입을 일절 import하지 않고 plain dict만 소비한다. DTO→dict 직렬화는 Controller가 `dataclasses.asdict`로 수행. (1) §2.1 전면 재작성(dict 경계 계약·트레이드오프 명시), §2.1 다이어그램 교체. (2) INV-V1 강화(`model/controller/common` 전부 금지, grep 검증). (3) §2.2 import 표에서 `common.dto` 허용 → 금지로 이동. (4) §3 디렉토리·LOC 표에 `view/contract.py`(~30) 추가, 합계 ~2,530으로 갱신. (5) §5.2 슬롯 시그니처 `list[MemberScore]`→`list[dict]`, `populate` 인자 `list[dict]`로 변경. (6) §5.3을 "보조 입력 타입(dataclass)"에서 "View 입력 dict 스키마 계약표 + contract.py 키 상수"로 재작성. (7) §6.3·§6.6·§7.1~7.4 시그니처를 dict 기반으로 수정(`_build_tooltip(member: dict)` 등). (8) §9 Worker 경계 설명에 Controller 직렬화 단계 추가. (9) §12 RTM에 contract.py 행 추가, 검증 포인트를 grep 식으로 갱신.** | QCE 개발팀 (이대한) |
+| **v1.2** | **2026-05-30** | **§5.3 점수 dict 키를 실제 `MemberScore`(common/dto) 필드명과 일치시킴: `raw_char_count`→`raw_chars`, `raw_msg_count`→`raw_messages`, `anomaly_flags`→`signals`. contract.py 상수값도 동일하게 갱신(상수 식별자 K_RAW_CHAR/K_RAW_MSG/K_ANOMALY는 유지, 값만 변경). 이로써 Controller의 `dataclasses.asdict()` 변환이 키 재매핑 없이 무손실이 된다. View 코드·테스트 fixture는 본 계약표를 단일 출처로 사용. | QCE 개발팀 (이대한) |
