@@ -15,7 +15,8 @@
 
 ### `02-design-planning/` (설계 및 기획)
 - `architecture-overview.md`: 시스템 아키텍처 및 DFD (데이터 흐름도)
-- `model-design.md`: 데이터 파서, NLP 엔진, 통계 엔진 모델 설계
+- `model-parser-design.md`: 데이터 파서 설계
+- `model-business-logic-design.md`: 정규화·Capping·이상 신호·집계·캐시·리포트 등 BusinessLogic 레이어 상세 설계
 - `view-design.md`: PyQt6 UI 계층 및 캔버스 시각화 설계
 - `controller-design.md`: 모델-뷰 중재 로직 설계
 

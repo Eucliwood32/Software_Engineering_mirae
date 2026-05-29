@@ -178,7 +178,7 @@ flowchart LR
 | EncodingHandler | Model·Parse | 조원희 | UTF-8→CP949 자동 감지 | NFR-3.1 |
 | Normalizer | Model·BL | 김휘중 | Min-Max 정규화 | FR-4.1 |
 | CappingScaler | Model·BL | 김휘중 | Capping·로그 스케일 | FR-4.2 |
-| AnomalySignalDetector | Model·BL | 김휘중 | EW-02 빈도·Z-Score 신호(표시 전용) | FR-4.2b, FR-4.2d |
+| AnomalySignalDetector | Model·BL | 김휘중 | EW-02 빈도·Z-Score 신호(표시 전용) | FR-4.2b, FR-4.2c |
 | WeightPresetManager | Model·BL | 김휘중 | 프리셋·합계 검증 | FR-4.4 |
 | WeightRebalancer | Model·BL | 김휘중 | 결측 소스 가중치 재조정 | FR-4.3 |
 | AliasMapper | Model·BL | 김휘중 | 식별자 N:1 통합 | FR-1.3 |
@@ -307,7 +307,7 @@ class CappingScaler:                    # FR-4.2
         """반환 (capped_value, capping_applied)."""
     def log_scale(self, total: int) -> float: ...
 
-class AnomalySignalDetector:            # FR-4.2b, FR-4.2d  (표시 전용, 점수 미반영)
+class AnomalySignalDetector:            # FR-4.2b, FR-4.2c  (표시 전용, 점수 미반영)
     def detect_frequency(self, repo: dict[str, CommitStats]) -> list[dict]: ...
     def detect_zscore(self, scores: list[MemberScore]) -> list[str]: ...
 
@@ -491,7 +491,7 @@ stateDiagram-v2
 | StopwordFilter | FR-3.3 | C-7 |
 | EncodingHandler | NFR-3.1 | C-5 |
 | Normalizer · CappingScaler | FR-4.1, FR-4.2 | — |
-| AnomalySignalDetector | FR-4.2b, FR-4.2d | STR-7, ConOps P5 (판정 금지) |
+| AnomalySignalDetector | FR-4.2b, FR-4.2c | STR-7, ConOps P5 (판정 금지) |
 | WeightRebalancer · WeightPresetManager | FR-4.3, FR-4.4 | — |
 | AliasMapper | FR-1.3 | — |
 | ContributionAggregator | FR-4.* 통합 | NFR-3.2 |
