@@ -565,6 +565,74 @@ def test_no_verdict_wording():                             # TC-FR-5.2-04
 | TC-FR-5.3-05 | P0 | L1 | missing=∅ | 배너·경고 미포함 |
 | TC-FR-5.3-06 | P1 | L3 | 산점도/레이더 | 결측 시각 표시(점선 등, FR-5.1b/c 참조) |
 
+## FR-5.4 3-스크린 네비게이션
+
+화면 전환은 Controller 슬롯(`show_submit`/`show_loading`/`show_result`) 호출로 일어난다. View는 `QStackedWidget` 현재 페이지로 검증한다.
+
+| TC-ID | P | L | 절차 | 기대 | 근거 |
+| :-- | :- | :- | :-- | :-- | :-- |
+| TC-FR-5.4-01 | P0 | L3 | 앱 기동(캐시 없음) | 현재 화면 == 제출(SubmitScreen) | 기동 화면 |
+| TC-FR-5.4-02 | P0 | L3 | `show_loading()` 호출 | 현재 화면 == 로딩(LoadingScreen) | 분석 진입 |
+| TC-FR-5.4-03 | P0 | L3 | `show_result()` 호출 | 현재 화면 == 결과(ResultScreen) | 완료 전환 |
+| TC-FR-5.4-04 | P1 | L3 | 로딩 중 오류 → `show_submit()` | 현재 화면 == 제출 | 오류 복귀 |
+| TC-FR-5.4-05 | P0 | L3 | 결과 화면 [새 분석] → `new_analysis_requested` | Signal 발행, 제출 화면 복귀 | 새 분석 |
+| TC-FR-5.4-06 | P1 | L3 | 캐시 단독 로드 후 기동 | 즉시 결과 화면 표시(NFR-2.4) | 캐시 진입 |
+
+## FR-5.5 메인(제출) 화면
+
+| TC-ID | P | L | 절차/입력 | 기대 | 근거 |
+| :-- | :- | :- | :-- | :-- | :-- |
+| TC-FR-5.5-01 | P1 | L3 | 제출 화면 표시 | 로고 위젯 존재 + 설명 텍스트(1줄 이상) | 로고·설명 |
+| TC-FR-5.5-02 | P0 | L3 | `_handle_dropped_paths(["a.docx","b.pptx","c.hwpx"])` | `documents_dropped`==`["a.docx","b.pptx","c.hwpx"]` | 문서 드롭 |
+| TC-FR-5.5-03 | P0 | L3 | `_handle_dropped_paths(["chat.txt"])` | `messenger_dropped`=="chat.txt" | 카톡 드롭 |
+| TC-FR-5.5-04 | P1 | L3 | 문서 3개 적재 | 적재 피드백 문자열에 "3" 포함 | 적재 피드백 |
+| TC-FR-5.5-05 | P0 | L3 | AnalysisPanel 합계 ≠ 1.0 | [분석 시작] disabled (FR-4.4 슬롯) | 가중치 검증 |
+
+## FR-5.6 분석 로딩 화면
+
+| TC-ID | P | L | 절차 | 기대 | 근거 |
+| :-- | :- | :- | :-- | :-- | :-- |
+| TC-FR-5.6-01 | P0 | L3 | `LoadingScreen.start()` | 진행률 표시(visible), 값 0 | 출현 |
+| TC-FR-5.6-02 | P0 | L3 | `set_value(60)` | 진행률 값 60 | 갱신 |
+| TC-FR-5.6-03 | P0 | L3 | `finish()` | 진행률 숨김 | 종료 |
+
+## FR-5.7 결과 화면 계정 병합 (post-hoc N:1)
+
+### 계약 (재집계 경로)
+```python
+# View(ResultScreen)는 merge_requested(mapping)만 발행한다.
+# 재집계는 Controller가 보유한 원시 지표에 mapping을 적용해 수행:
+#   AliasMapper.merge(raw, mapping) → ContributionAggregator.aggregate(...) (재정규화)
+# 정규화는 팀원 집합 전체 의존 → 병합 시 모든 팀원 점수가 갱신될 수 있다(FR-4.1).
+```
+
+| TC-ID | P | L | 절차/입력 | 기대 | 근거 |
+| :-- | :- | :- | :-- | :-- | :-- |
+| TC-FR-5.7-01 | P0 | L3 | `ResultScreen.render(scores, missing)` | 결과의 모든 author가 병합 후보에 제시 | 후보 제시 |
+| TC-FR-5.7-02 | P0 | L3 | 복수 인물 선택 후 병합 확정 | `merge_requested({alias→member})` 발행(QSignalSpy) | 병합 발행 |
+| TC-FR-5.7-03 | P0 | L2 | `AliasMapper.merge` 후 `aggregate` 재호출 | 병합 인물 원시 지표 합산 + 전체 재정규화로 타 팀원 점수도 갱신 | 재집계 |
+| TC-FR-5.7-04 | P1 | L2 | 병합 해제(분리) 매핑으로 재집계 | 분리 전 상태와 동일 결과 | 병합 취소 |
+| TC-FR-5.7-05 | P0 | L2 | 동일 병합 입력 2회 재집계 | 결과 완전 일치(NFR-1.3) | 결정론 |
+| TC-FR-5.7-06 | P1 | L2 | 재집계 진행 중 추가 병합 요청 | `is_analyzing` 가드로 차단(NFR-1.2) | 중복 차단 |
+
+```python
+def test_result_merge_emits_signal(qtbot):                 # TC-FR-5.7-02
+    rs = ResultScreen(); qtbot.addWidget(rs)
+    rs.render(sample_score_dicts(4), set())
+    # 병합 컨트롤에서 두 인물을 같은 팀원으로 지정
+    rs.merge.combo_for("이대한").setCurrentText("이대한")
+    rs.merge.combo_for("daehan.lee").setCurrentText("이대한")
+    with qtbot.waitSignal(rs.merge_requested, timeout=1000) as blocker:
+        rs.merge._confirm()
+    assert blocker.args[0]["daehan.lee"] == "이대한"
+
+def test_merge_reaggregation_changes_others(...):          # TC-FR-5.7-03 (L2, Controller+Model)
+    # 두 계정 병합 → 재정규화로 나머지 팀원 정규화 점수가 병합 전과 달라짐을 검증
+    ...
+```
+
+> **레이어 책임.** TC-FR-5.7-01·02는 View(L3, 이대한). TC-FR-5.7-03~06은 재집계 경로로 Controller+Model(L2)이며, AliasMapper·ContributionAggregator·AnalysisOrchestrator의 병합 재호출 지원에 의존한다(controller-design.md 담당자 협의 대상).
+
 ---
 
 # NFR-1. UI 응답성·동시성
@@ -771,7 +839,7 @@ def test_isolation_one_module_fails(monkeypatch):          # TC-NFR-3.2-03
 # 부록 B. 미커버 점검 (G8)
 
 아래 FR/NFR 중 `test-cases.md`에 케이스가 **하나도 없으면** G8 위반 → 즉시 추가.
-`FR-1.1 1.2 1.3 / 2.1 2.2 / 3.1 3.2 3.3 / 4.1 4.2 4.2b 4.2d 4.3 4.4 / 5.1 5.1a 5.1b 5.1c 5.1d 5.2 5.3`
+`FR-1.1 1.2 1.3 / 2.1 2.2 / 3.1 3.2 3.3 / 4.1 4.2 4.2b 4.2d 4.3 4.4 / 5.1 5.1a 5.1b 5.1c 5.1d 5.2 5.3 5.4 5.5 5.6 5.7`
 `NFR-1.1 1.2 1.3 / 2.1 2.2 2.3 2.4 / 3.1 3.2`
 (본 문서 기준 전 항목 커버됨 — 확장 시 본 목록과 §10 추적표를 동기화한다.)
 
@@ -782,3 +850,4 @@ def test_isolation_one_module_fails(monkeypatch):          # TC-NFR-3.2-03
 | 버전 | 일자 | 변경 | 작성자 |
 | :--- | :--- | :--- | :--- |
 | v1.0 | 2026-05-29 | 최초 작성. 전 FR/NFR에 대한 실행 가능 케이스, 계약 블록, pytest 스켈레톤, 12개 차트 게이트, 수동 체크리스트, 미커버 점검 포함. RR v1.3 기준(슬랙 제외·3종 차트·FR-4.2d 통일). | QCE 개발팀 |
+| **v1.1** | **2026-05-31** | **RR v1.4·view-design v1.3 동기화: FR-5.4(3-스크린 네비게이션)·FR-5.5(제출 화면)·FR-5.6(로딩 화면)·FR-5.7(결과 화면 계정 병합 재집계) 케이스 신설. FR-5.7은 View(L3) + 재집계 경로(Controller+Model, L2)로 분리. 부록 B 미커버 점검 목록에 5.4~5.7 추가.** | QCE 개발팀 (이대한) |

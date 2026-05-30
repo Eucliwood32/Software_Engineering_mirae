@@ -345,18 +345,26 @@ STAGE 6  컨트롤러 (← 모든 Model)
          ├ AnalysisOrchestrator  (NFR-1.1/1.2/3.2)    ← pytest-qt
          └ AppController         (라우팅)
 
-STAGE 7  뷰 (← MemberScore 형태만)
+STAGE 7  뷰 (← 점수 dict 형태만; View는 plain dict 소비, INV-V1)
          ├ GitMissingDialog      (FR-2.2 UI)
          ├ AnalysisPanel         (FR-4.4 UI)
          ├ BarChartWidget        (FR-5.1a)
          ├ RadarChartWidget      (FR-5.1b)
          ├ ScatterChartWidget    (FR-5.1c)
          ├ WarningBanner         (FR-5.3 UI)
-         └ [FR-5.1d] 차트 12 케이스 — 위 3 차트 GREEN 후 일괄 검증
+         ├ ProgressBar           (NFR-1.1 UI)
+         ├ [FR-5.1d] 차트 12 케이스 — 위 3 차트 GREEN 후 일괄 검증
+         ├ SubmitScreen          (FR-5.5 — 로고·드롭존·AnalysisPanel·분석시작)
+         ├ LoadingScreen         (FR-5.6 — 진행률)
+         ├ ResultScreen          (FR-5.7 — 대시보드+병합 컨트롤; merge_requested 발행)
+         └ MainWindow            (FR-5.4 — QStackedWidget 3-스크린 전환)
+         # 결과 화면 계정 병합의 '재집계'(FR-5.7 L2)는 STAGE 8로 — Controller+Model 왕복
 
 STAGE 8  통합·시스템
          ├ test_module_isolation (NFR-3.2)
          ├ test_pipeline_missing_source (FR-4.3 E2E)
+         ├ test_merge_reaggregation (FR-5.7 — 결과 화면 병합 매핑 재집계→재정규화, 타 팀원 점수 변동·결정론)
+         ├ test_screen_navigation (FR-5.4 — 제출→로딩→결과 전환 + 새 분석/병합 전이)
          └ manual_checklist (시나리오 A/B/C)
 ```
 
@@ -523,6 +531,10 @@ WRITE_OK = {"qce/model/business/report_exporter.py",
 | FR-5.1d | ui/test_chart_acceptance.py (12 케이스) | L3 |
 | FR-5.2 | unit/model/business/test_report_exporter.py | L1 |
 | FR-5.3 | unit/model/business/test_report_exporter.py + ui/test_warning_banner.py | L1+L3 |
+| FR-5.4 | ui/test_main_window.py (화면 전환) | L3 |
+| FR-5.5 | ui/test_submit_screen.py | L3 |
+| FR-5.6 | ui/test_loading_screen.py | L3 |
+| FR-5.7 | ui/test_result_screen.py (병합 발행) + integration/test_merge_reaggregation.py (재집계) | L3+L2 |
 | NFR-1.1 | ui/test_async_progress.py | L3 |
 | NFR-1.2 | integration/test_orchestrator.py | L2 |
 | NFR-1.3 | unit/model/business/test_contribution_aggregator.py (결정론) | L1 |
@@ -550,3 +562,4 @@ WRITE_OK = {"qce/model/business/report_exporter.py",
 | 버전 | 일자 | 변경 | 작성자 |
 | :--- | :--- | :--- | :--- |
 | v1.0 | 2026-05-29 | 최초 작성. RR v1.3·architecture v1.0 기준. AI TDD 루프, 정적 게이트(C 제약 코드화), 빌드 DAG, 픽스처 팩토리 계약, 추적 매트릭스 포함. SRS v2.0과의 차이 §1.3에 해소. | QCE 개발팀 |
+| **v1.1** | **2026-05-31** | **RR v1.4·view-design v1.3 동기화: §6 STAGE 7에 SubmitScreen(FR-5.5)·LoadingScreen(FR-5.6)·ResultScreen(FR-5.7)·MainWindow(FR-5.4)·ProgressBar 추가, STAGE 8에 결과 화면 병합 재집계(test_merge_reaggregation)·화면 전환(test_screen_navigation) 통합 테스트 추가. §10 추적 매트릭스에 FR-5.4~5.7 행 추가. FR-5.7 재집계는 Controller+Model 왕복(L2)으로 분류.** | QCE 개발팀 (이대한) |

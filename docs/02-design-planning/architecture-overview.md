@@ -3,10 +3,10 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 문서 버전 | v1.1 |
+| 문서 버전 | v1.2 |
 | 작성일 | 2026-05-28 |
 | 준수 표준 | ISO/IEC/IEEE 29148-2018, ISO/IEC/IEEE 42010 (아키텍처 기술) |
-| 상위 문서 | SRS v2.2, Requirements Record v1.3, Concept of Operations v1.2, Development Constraints v2.0 |
+| 상위 문서 | SRS v2.2, Requirements Record v1.4, Concept of Operations v1.3, Development Constraints v2.0 |
 | 관련 ADR | ADR-0001(MVC), ADR-0002(PyQt6), ADR-0003(kiwipiepy>KoNLPy), ADR-0004(JSON 캐시 vs pickle) |
 | 작성 주체 | QCE 개발팀 (20222047 조원희 · 20247142 이대한 · 20221985 김휘중) |
 
@@ -96,9 +96,12 @@ flowchart TD
 ```mermaid
 flowchart LR
     subgraph V["View [이대한]"]
-        MW[MainWindow]
+        MW[MainWindow · QStackedWidget 셸]
+        SUB[SubmitScreen]
+        LOAD[LoadingScreen]
+        RES[ResultScreen]
         GMD[GitMissingDialog]
-        AMD[AliasMappingDialog]
+        AMD[AliasMappingDialog · 결과 병합]
         AP[AnalysisPanel]
         DV[DashboardView]
         WB[WarningBanner]
@@ -156,10 +159,13 @@ flowchart LR
 
 | 컴포넌트 | 레이어 | 담당 | 책임 | 추적 FR/NFR |
 | :--- | :--- | :--- | :--- | :--- |
-| MainWindow | View | 이대한 | 앱 셸·레이아웃·메뉴 | — |
+| MainWindow | View | 이대한 | 앱 셸·QStackedWidget 3-스크린 전환·메뉴·상태바 | FR-5.4 |
+| SubmitScreen | View | 이대한 | 로고·설명·멀티포맷 드롭존·AnalysisPanel·[분석 시작] | FR-5.5 |
+| LoadingScreen | View | 이대한 | 전체화면 진행률(ProgressBar 임베드) | FR-5.6 |
+| ResultScreen | View | 이대한 | DashboardView+결측 배너+계정 병합+[새 분석] | FR-5.7 |
 | GitMissingDialog | View | 이대한 | Git 부재 모달, 다운로드 링크 | FR-2.2 |
-| AliasMappingDialog | View | 이대한 | 식별자 N:1 매핑 UI | FR-1.3 |
-| AnalysisPanel | View | 이대한 | 프리셋·슬라이더·합계 검증 | FR-4.4 |
+| AliasMappingDialog | View | 이대한 | 식별자 N:1 매핑 UI (v1.2: 결과 화면 병합 컨트롤로 재사용) | FR-1.3, FR-5.7 |
+| AnalysisPanel | View | 이대한 | 프리셋·슬라이더·합계 검증 (SubmitScreen에 합성) | FR-4.4 |
 | DashboardView | View | 이대한 | 차트 3종 컨테이너·placeholder | FR-5.1 |
 | BaseChartWidget | View | 이대한 | 차트 공통 추상(렌더·placeholder·애니메이션 훅) | FR-5.1 |
 | BarChartWidget | View | 이대한 | 막대 차트·툴팁·평균선 | FR-5.1a |
@@ -369,11 +375,27 @@ class AppController:
 
 ### 5.5 View 레이어 [이대한]
 
+> **경계 데이터 계약.** View는 내부 타입(`MemberScore` 등)을 import하지 않고 plain dict만 소비한다(결정 A·INV-V1). Controller가 `dataclasses.asdict()`로 직렬화해 push한다. 상세 키 계약·시그니처는 `view-design.md` v1.3 §2.1·§5 참조.
+
 ```python
+class MainWindow(QMainWindow):          # FR-5.4 — QStackedWidget 3-스크린 셸
+    def show_submit(self)  -> None: ...
+    def show_loading(self) -> None: ...
+    def show_result(self)  -> None: ...
+
+class SubmitScreen(QWidget):            # FR-5.5
+    documents_dropped = pyqtSignal(list)
+    git_repo_chosen   = pyqtSignal(str)
+    messenger_dropped = pyqtSignal(str)   # AnalysisPanel(FR-4.4) 합성
+
+class ResultScreen(QWidget):            # FR-5.7
+    merge_requested        = pyqtSignal(dict)   # {alias→member} 결과 화면 병합 → 재집계
+    new_analysis_requested = pyqtSignal()
+    def render(self, scores: list[dict], missing: set[str]) -> None: ...
+
 class BaseChartWidget(QWidget):         # FR-5.1
-    def render(self, scores: list[MemberScore]) -> None: ...      # 추상
-    def show_placeholder(self) -> None:                            # "분석을 실행하면..."
-        ...
+    def render(self, scores: list[dict], missing: set[str]) -> None: ...  # 추상, dict 소비
+    def show_placeholder(self) -> None: ...                                # "분석을 실행하면..."
     def clear(self) -> None: ...
 
 class ScatterChartWidget(BaseChartWidget):   # FR-5.1c
@@ -453,6 +475,8 @@ flowchart LR
 
 **결측 처리 흐름(FR-4.3).** 임의 소스가 None이면 AliasMapper 단계에서 누락되고, WeightRebalancer가 해당 가중치를 0으로 만든 뒤 나머지를 합 1.0으로 재정규화한다. WarningBanner·리포트 경고는 결측 소스 집합을 받아 표시한다(FR-5.3).
 
+**신원 병합 흐름(FR-1.3 / FR-5.7).** 1차 분석은 사전 매핑 없이 각 식별자를 독립 인물로 산출한다(AliasMapper에 항등 매핑 통과). 조장이 **결과 화면**에서 동일인의 계정들을 1인으로 병합하면, View가 `merge_requested(mapping)`를 올리고 Controller가 보유 중인 원시 지표에 새 매핑을 적용해 `AliasMapper.merge → ContributionAggregator(재정규화)`를 다시 돌려 결과를 재렌더한다. 정규화가 팀원 집합 전체에 의존하므로 병합은 시각 합산이 아닌 **재집계**다(NFR-1.2 가드·NFR-1.3 결정론 재적용). 분석-전 매핑 모달은 폐기되었다(RR v1.4).
+
 ---
 
 ## 8. 캐시·영속성
@@ -501,7 +525,8 @@ stateDiagram-v2
 | AppController | (전역 라우팅) | C-4 |
 | BaseChartWidget 외 차트 3종 | FR-5.1, FR-5.1a/b/c | C-5 (matplotlib) |
 | DashboardView · WarningBanner · ProgressBar | FR-5.1, FR-5.3, NFR-1.1 | C-4 |
-| GitMissingDialog · AliasMappingDialog · AnalysisPanel · SaveReportDialog | FR-2.2, FR-1.3, FR-4.4, FR-5.2 | C-4 |
+| MainWindow · SubmitScreen · LoadingScreen · ResultScreen | FR-5.4, FR-5.5, FR-5.6, FR-5.7 | C-4 |
+| GitMissingDialog · AliasMappingDialog · AnalysisPanel · SaveReportDialog | FR-2.2, FR-1.3/FR-5.7, FR-4.4, FR-5.2 | C-4 |
 | 전 레이어 | — | C-1, C-2 (네트워크 레이어 부재) |
 
 > **MVC 불변식 검증 포인트.** 정적 분석(import 그래프)에서 View→Model 직접 의존이 0건이어야 하며, Model 레이어에서 PyQt6 import가 0건이어야 한다(C-4, NFR-3.2 Fail 조건).
@@ -514,3 +539,4 @@ stateDiagram-v2
 | :--- | :--- | :--- | :--- |
 | v1.0 | 2026-05-28 | 최초 작성. RR v1.3·ConOps v1.2·dev-constraints v2.0 기준 9장 구성. DocumentParser 파사드(.hwpx 반영), 카톡 전용 MessengerParser·자동 StopwordFilter(FR-3.1/3.3 반영), AnomalySignalDetector 분리(판정 금지), 차트 BaseChartWidget 상속 구조, 핵심 인터페이스 시그니처, 동시성·데이터 흐름·캐시 다이어그램, 아키텍처 RTM 포함 | QCE 개발팀 |
 | **v1.1** | **2026-05-28** | **MVC 구현 책임 배정 명확화: Controller 레이어 담당을 "공동" → **김휘중** 단독으로 변경(§3.1 레이어 다이어그램, §4.1 컴포넌트 다이어그램, §4.2 컴포넌트 책임 표의 AppController·AnalysisOrchestrator, §5.4 절 제목). View 레이어(이대한), Model 레이어(조원희 · 김휘중 공동)는 기존과 동일하게 유지. 인터페이스 시그니처·다이어그램 구조 등 그 외 내용 변경 없음.** | QCE 개발팀 |
+| **v1.2** | **2026-05-31** | **3-스크린 구조(FR-5.4)·결과 화면 계정 병합(FR-5.7) 반영(RR v1.4·view-design v1.3 동기화). (1) 상위 문서 참조를 RR v1.4·ConOps v1.3로 갱신. (2) §4.1 View 컴포넌트 다이어그램에 SubmitScreen·LoadingScreen·ResultScreen 추가, MainWindow를 QStackedWidget 셸로·AliasMappingDialog를 결과 병합으로 표기. (3) §4.2 책임표에 3-스크린 행 추가, MainWindow(FR-5.4)·AliasMappingDialog(FR-1.3/5.7)·AnalysisPanel(SubmitScreen 합성) 갱신. (4) §5.5 View 시그니처에 MainWindow 화면 전환·SubmitScreen·ResultScreen(merge_requested) 클래스 추가, 차트 render를 list[dict] 소비로 정정, 경계 dict 계약 주석 추가. (5) §7 데이터 흐름에 신원 병합(분석-후 재집계) 흐름 문단 추가. (6) §9 RTM에 3-스크린 행 추가·AliasMappingDialog에 FR-5.7 연결. Controller 레이어 상세(병합 재집계 오케스트레이션)는 controller-design.md 담당자 갱신 대상으로 남김.** | QCE 개발팀 (이대한) |
