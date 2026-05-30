@@ -26,6 +26,7 @@ class WarningBanner(QWidget):
         self._label.setObjectName("warningBanner")
         self._label.setWordWrap(True)
         layout.addWidget(self._label)
+        self._shown = False
         self.setVisible(False)
 
     def show_missing(self, missing: set[str]) -> None:
@@ -35,10 +36,12 @@ class WarningBanner(QWidget):
             return
         lines = [self.TEMPLATE.format(src=self._label_for(s)) for s in self._ordered(missing)]
         self._label.setText("\n".join(lines))
+        self._shown = True
         self.setVisible(True)
 
     def clear(self) -> None:
         self._label.setText("")
+        self._shown = False
         self.setVisible(False)
 
     @staticmethod
@@ -56,4 +59,4 @@ class WarningBanner(QWidget):
         return self._label.text()
 
     def is_banner_visible(self) -> bool:
-        return self.isVisible()
+        return self._shown
