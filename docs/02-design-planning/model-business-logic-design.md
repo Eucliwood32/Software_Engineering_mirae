@@ -3,9 +3,9 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 문서 버전 | v1.1 |
-| 작성일 | 2026-05-30 |
-| 상위 문서 | Architecture Overview v1.1, Requirements Record v1.3, Development Constraints v2.0 |
+| 문서 버전 | v1.2 |
+| 작성일 | 2026-05-31 |
+| 상위 문서 | Architecture Overview v1.2, Requirements Record v1.4, Development Constraints v2.0, Controller Design v1.1 |
 | 관련 ADR | ADR-0004 (JSON 캐시 vs pickle) |
 | 작성 주체 | QCE 개발팀 (김휘중) |
 
@@ -175,6 +175,9 @@ class MemberScore:                      # FR-4.* 통합 결과
   1. `mapping`에 등록된 각 alias의 지표 데이터를 해당 팀원 키로 합산한다.
   2. `mapping`에 등록되지 않은 **미매핑 식별자**의 데이터는 결과에서 자동 제외한다.
   3. 서로 다른 미매핑 식별자를 시스템이 임의로 병합하지 않는다.
+- **호출 방식 (FR-1.3 개정, Controller Design v1.1 §4 연동):**
+  - **1차 분석:** Controller가 각 식별자를 자기 자신으로 매핑하는 **항등 매핑** `{alias: alias}`를 전달한다. 분석-전 매핑 다이얼로그는 폐기되었으므로, 분석 시점에는 조장의 매핑 입력이 없다.
+  - **병합 재집계 (FR-5.7):** 결과 화면에서 조장이 병합 그룹을 제출하면, Controller가 해당 매핑을 전달하여 `AliasMapper.merge`를 재호출한다. 파서는 재실행하지 않으며, Orchestrator가 보유 중인 원시 지표 위에서 호출된다.
 - **용어 구분 (RR §1.4):**
   - **Unknown 작성자:** OOXML 메타데이터 자체가 비어 있는 문서의 작성자 분류 (FR-1.2). 단일 정의된 분류이다.
   - **미매핑 식별자:** 입력 소스에서 발견되었으나 조장이 어느 팀원에도 연결하지 않은 식별자. Unknown과 미매핑은 별개로 처리된다.
@@ -211,6 +214,8 @@ class MemberScore:                      # FR-4.* 통합 결과
   6. **이상 신호 탐지:** `AnomalySignalDetector.detect_frequency()` 및 `detect_zscore()`를 호출하여 신호를 수집한다. 신호는 `MemberScore.anomaly_flags`에 기록되지만 `total_score` 계산에는 사용되지 않는다 (STR-7, ConOps P5).
   7. **종합 점수 산출:** 정규화된 점수에 보정된 가중치를 곱하여 `total_score`를 계산한다: `total = git_score * w_git + doc_score * w_doc + msg_score * w_msg`.
   8. **MemberScore 조립:** 팀원별로 `MemberScore` 인스턴스를 생성하여 리스트로 반환한다.
+- **병합 재집계 경로 (FR-5.7, Controller Design v1.1 §6 연동):** 결과 화면에서 병합 요청이 발생하면, Controller가 `AliasMapper.merge(raw, new_mapping)` 결과를 입력으로 이 메서드를 재호출한다. 인터페이스는 변경되지 않으며, 병합 후 팀원 집합이 달라지면 Min-Max 정규화 기준이 재산출된다 (FR-4.1). 이것이 시각적 점수 합산이 아니라 재집계여야 하는 이유이다.
+- **출력 소비 방식 (INV-V1):** `aggregate()`의 반환값(`list[MemberScore]`)은 Controller(`AppController.on_analysis_completed`)에서 `dataclasses.asdict()`로 직렬화된 뒤 View에 전달된다. Model 레이어는 이 직렬화에 관여하지 않는다.
 
 ---
 
@@ -308,4 +313,5 @@ msgs: {author: count} ──┤                   │         │
 | 버전 | 일자 | 변경 | 작성자 |
 | :--- | :--- | :--- | :--- |
 | v1.0 | 2026-05-30 | 최초 작성. 9개 BusinessLogic 컴포넌트 상세 설계. | QCE 개발팀 |
-| **v1.1** | **2026-05-30** | **(1) FR-4.2d → FR-4.2c 식별자 통일 (architecture-overview.md v1.1 동기화). (2) 참조 데이터 타입(§1.4) 추가. (3) 설계 불변식(§1.3) 추가 — PyQt6 금지, 파서 직접 import 금지, 판정 금지, 결정론 보장. (4) AliasMapper에 Unknown vs 미매핑 용어 구분 명시. (5) CacheManager에 저장 항목 화이트리스트 및 원자적 쓰기 절차 상세 추가. (6) ReportExporter에 경고 문구 형식 사양 추가. (7) 컴포넌트 간 데이터 흐름도(§3) 추가. (8) 아키텍처 RTM(§4) 추가. (9) 각 클래스에 코드 블록 형태의 시그니처 추가.** | QCE 개발팀 |
+| v1.1 | 2026-05-30 | (1) FR-4.2d → FR-4.2c 식별자 통일 (architecture-overview.md v1.1 동기화). (2) 참조 데이터 타입(§1.4) 추가. (3) 설계 불변식(§1.3) 추가 — PyQt6 금지, 파서 직접 import 금지, 판정 금지, 결정론 보장. (4) AliasMapper에 Unknown vs 미매핑 용어 구분 명시. (5) CacheManager에 저장 항목 화이트리스트 및 원자적 쓰기 절차 상세 추가. (6) ReportExporter에 경고 문구 형식 사양 추가. (7) 컴포넌트 간 데이터 흐름도(§3) 추가. (8) 아키텍처 RTM(§4) 추가. (9) 각 클래스에 코드 블록 형태의 시그니처 추가. | QCE 개발팀 |
+| **v1.2** | **2026-05-31** | **(1) AliasMapper §2.6에 호출 방식 명시 — 1차 분석=항등 매핑, 병합 재집계=결과 화면 사후 재호출 (FR-1.3 개정, Controller Design v1.1 §4 연동). (2) ContributionAggregator §2.7에 병합 재집계 경로 및 재정규화 필요성 명시 (FR-5.7). (3) ContributionAggregator §2.7에 출력 소비 방식(INV-V1 — asdict 직렬화는 Controller 책임) 명시. (4) 상위 문서 목록에 Controller Design v1.1 추가.** | QCE 개발팀 |

@@ -11,9 +11,10 @@ QCE(Quantitative Contribution Evaluator) 시스템의 Model · BusinessLogic 레
 import math
 import json
 import os
+import io
 import csv
 from dataclasses import dataclass, field
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple, Union
 
 # ==========================================
 # 1. 공용 데이터 타입 (Architecture Overview §5.1)
@@ -90,13 +91,34 @@ class AnomalySignalDetector:
     FR-4.2b, FR-4.2c: 통계적/규칙적 이상 징후 식별 신호 생성.
     (ConOps P5 원칙에 따라 점수에 자동 반영되지 않으며, 표시 전용 데이터입니다.)
     """
-    def detect_frequency(self, repo: Dict[str, CommitStats]) -> List[dict]:
+    def detect_frequency(self, repo: Dict[str, List[dict]]) -> List[dict]:
         """
-        EW-02: 특정 일자 커밋 수가 일평균 커밋 수 3배 초과 시 신호 발생.
-        (본 메서드는 입력 시그니처 상의 데이터만으로 구현 불가능한 확장 스펙이므로 
-        시계열 데이터가 추후 제공된다고 가정하고 기본 리스트를 반환합니다.)
+        EW-02: 작성자 단기 커밋 빈도가 평소 일평균의 3배 초과 구간을 신호로.
+        입력: {author: [{"date": "YYYY-MM-DD", "commits": int}, ...]}
+        반환: [{author, period, period_commits, baseline_avg}, ...]
         """
-        return []
+        signals = []
+        for author, daily_commits in repo.items():
+            if not daily_commits:
+                continue
+            # 일평균 커밋 수 산출
+            total_commits = sum(d.get("commits", 0) for d in daily_commits)
+            num_days = len(daily_commits)
+            if num_days == 0:
+                continue
+            baseline_avg = total_commits / num_days
+            
+            # 각 일자의 커밋 수가 일평균의 3배 초과인지 검사
+            for day_info in daily_commits:
+                day_commits = day_info.get("commits", 0)
+                if baseline_avg > 0 and day_commits > baseline_avg * 3:
+                    signals.append({
+                        "author": author,
+                        "period": day_info.get("date", ""),
+                        "period_commits": day_commits,
+                        "baseline_avg": round(baseline_avg, 4)
+                    })
+        return signals
 
     def detect_zscore(self, scores: List[MemberScore]) -> List[str]:
         """FR-4.2c: 정규화 지표 중 Z-Score ≤ -1.5 인 지표가 2개 이상인 팀원 반환"""
@@ -194,21 +216,52 @@ class ContributionAggregator:
         self.normalizer = Normalizer()
         self.capping_scaler = CappingScaler()
         self.anomaly_detector = AnomalySignalDetector()
+        self.weight_rebalancer = WeightRebalancer()
         
     def aggregate(self, 
-                  git_data: Dict[str, int],  # {author: additions}
-                  doc_data: Dict[str, int],  # {author: chars}
-                  msg_data: Dict[str, int],  # {author: messages}
-                  weights: Dict[str, float]) -> List[MemberScore]:
+                  git: Optional[Dict[str, CommitStats]] = None,
+                  docs: Optional[Dict[str, int]] = None,
+                  msgs: Optional[Dict[str, int]] = None,
+                  weights: Optional[Dict[str, float]] = None) -> List[MemberScore]:
+        """
+        가용 소스만으로 종합 점수 산출(NFR-3.2). 
+        None 소스는 WeightRebalancer 경유.
+        """
+        if weights is None:
+            weights = {"git": 0.4, "doc": 0.4, "msg": 0.2}
         
-        # 통합 인원 집합
-        authors = sorted(list(set(git_data.keys()) | set(doc_data.keys()) | set(msg_data.keys())))
+        # 1. 가용 소스 판별
+        available: Set[str] = set()
+        if git is not None:
+            available.add("git")
+        if docs is not None:
+            available.add("doc")
+        if msgs is not None:
+            available.add("msg")
+            
+        # 2. 가중치 재조정 (결측 소스 처리)
+        rebalanced = self.weight_rebalancer.rebalance(weights, available)
         
-        raw_additions = [git_data.get(a, 0) for a in authors]
-        raw_docs = [doc_data.get(a, 0) for a in authors]
-        raw_msgs = [msg_data.get(a, 0) for a in authors]
+        # 3. 통합 인원 집합
+        author_set: Set[str] = set()
+        if git is not None:
+            author_set |= set(git.keys())
+        if docs is not None:
+            author_set |= set(docs.keys())
+        if msgs is not None:
+            author_set |= set(msgs.keys())
+        authors = sorted(list(author_set))
         
-        # Git Capping & Log Scaling 적용
+        # 4. 원시 값 추출
+        raw_additions = []
+        raw_docs_vals = []
+        raw_msgs_vals = []
+        for a in authors:
+            raw_additions.append(git[a].additions if (git is not None and a in git) else 0)
+            raw_docs_vals.append(docs.get(a, 0) if docs is not None else 0)
+            raw_msgs_vals.append(msgs.get(a, 0) if msgs is not None else 0)
+        
+        # 5. Git Capping & Log Scaling 적용
         log_additions = []
         capping_flags = []
         for add in raw_additions:
@@ -216,35 +269,38 @@ class ContributionAggregator:
             capping_flags.append(is_capped)
             log_additions.append(self.capping_scaler.log_scale(capped_val))
             
-        # Min-Max 정규화 적용
-        git_norm = self.normalizer.normalize(log_additions)
-        doc_norm = self.normalizer.normalize(raw_docs)
-        msg_norm = self.normalizer.normalize(raw_msgs)
+        # 6. Min-Max 정규화 적용
+        git_norm = self.normalizer.normalize(log_additions) if git is not None else [0.0] * len(authors)
+        doc_norm = self.normalizer.normalize(raw_docs_vals) if docs is not None else [0.0] * len(authors)
+        msg_norm = self.normalizer.normalize(raw_msgs_vals) if msgs is not None else [0.0] * len(authors)
         
+        # 7. MemberScore 조립
         scores = []
         for i, author in enumerate(authors):
             g = git_norm[i]
             d = doc_norm[i]
             m = msg_norm[i]
             
-            # 최종 점수 산출 (가중치 적용)
-            total = (g * weights.get('git', 0.0)) + (d * weights.get('doc', 0.0)) + (m * weights.get('msg', 0.0))
+            # 종합 점수 산출 (보정된 가중치 적용)
+            total = (g * rebalanced.get('git', 0.0)) + \
+                    (d * rebalanced.get('doc', 0.0)) + \
+                    (m * rebalanced.get('msg', 0.0))
             
             score_obj = MemberScore(
                 author=author,
                 git_score=g,
                 doc_score=d,
                 msg_score=m,
-                total_score=total,
+                total_score=round(total, 4),
                 raw_additions=raw_additions[i],
-                raw_char_count=raw_docs[i],
-                raw_msg_count=raw_msgs[i],
+                raw_char_count=raw_docs_vals[i],
+                raw_msg_count=raw_msgs_vals[i],
                 capping_applied=capping_flags[i],
                 anomaly_flags=[]
             )
             scores.append(score_obj)
             
-        # 신호탐지 실행 및 플래그 갱신
+        # 8. 신호탐지 실행 및 플래그 갱신 (점수 미반영 — STR-7, ConOps P5)
         z_score_anomalies = self.anomaly_detector.detect_zscore(scores)
         for s in scores:
             if s.author in z_score_anomalies:
@@ -257,52 +313,105 @@ class ContributionAggregator:
 
 class CacheManager:
     """NFR-2.3, NFR-2.4, C-8: 원자적 JSON 캐싱 시스템 (pickle 사용 철저히 배제)"""
-    def save(self, data: dict, path: str) -> None:
-        temp_path = path + ".tmp"
+    CACHE_FILE = ".qce_cache"
+    TMP_FILE = ".qce_cache.tmp"
+
+    def save(self, data: dict) -> None:
+        """tmp 쓰기 → fsync → os.replace 원자적 커밋. json만 사용."""
         try:
-            with open(temp_path, 'w', encoding='utf-8') as f:
+            with open(self.TMP_FILE, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
-            os.replace(temp_path, path) # 원자적 덮어쓰기
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(self.TMP_FILE, self.CACHE_FILE)  # 원자적 덮어쓰기
         except Exception as e:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
+            if os.path.exists(self.TMP_FILE):
+                os.remove(self.TMP_FILE)
             raise e
             
-    def load(self, path: str) -> dict:
-        if not os.path.exists(path):
+    def load(self) -> dict:
+        """JSONDecodeError/KeyError → 파일 삭제 + 빈 dict 반환."""
+        if not os.path.exists(self.CACHE_FILE):
             return {}
         try:
-            with open(path, 'r', encoding='utf-8') as f:
+            with open(self.CACHE_FILE, 'r', encoding='utf-8') as f:
                 return json.load(f)
-        except (json.JSONDecodeError, UnicodeDecodeError):
+        except (json.JSONDecodeError, KeyError, UnicodeDecodeError):
+            # 손상 캐시 삭제
+            if os.path.exists(self.CACHE_FILE):
+                os.remove(self.CACHE_FILE)
             return {}
 
 
 class ReportExporter:
-    """FR-5.2, FR-5.3: 평가 결과 보고서(CSV 등) 추출 (STR-7 판정 금지 용어 준수)"""
-    def export_csv(self, scores: List[MemberScore], path: str) -> None:
-        # 엑셀 호환을 위해 UTF-8 BOM 인코딩을 사용
-        with open(path, 'w', encoding='utf-8-sig', newline='') as f:
-            writer = csv.writer(f)
+    """FR-5.2, FR-5.3: 평가 결과 보고서(Markdown/CSV) 추출 (STR-7 판정 금지 용어 준수)"""
+    
+    # FR-5.3 경고 문구 형식
+    WARNING_TEMPLATE = "⚠ {source} 데이터의 형식 불일치 또는 부재로 인해 해당 지표가 평가에서 제외되었습니다."
+    
+    def to_markdown(self, scores: List[MemberScore], missing: Set[str] = None) -> str:
+        """마크다운 테이블 구조(헤더+행) + 결측 소스 blockquote 경고."""
+        if missing is None:
+            missing = set()
+            
+        # 종합 지표 기준 내림차순 정렬
+        sorted_scores = sorted(scores, key=lambda x: x.total_score, reverse=True)
+        
+        lines = []
+        # 테이블 헤더 (판정 금지: "최종 평가" 금지, "종합 지표" 사용)
+        lines.append("| 팀원 | 종합 지표 | Git 지표 | 문서 지표 | 메신저 지표 | Capping 적용 | 확인 필요 |")
+        lines.append("|---|---|---|---|---|---|---|")
+        
+        for s in sorted_scores:
+            capping = "O" if s.capping_applied else "X"
+            anomaly = ", ".join(s.anomaly_flags) if s.anomaly_flags else ""
+            lines.append(f"| {s.author} | {round(s.total_score, 4)} | {round(s.git_score, 4)} | {round(s.doc_score, 4)} | {round(s.msg_score, 4)} | {capping} | {anomaly} |")
+        
+        # 결측 소스 경고 (블록쿼트)
+        if missing:
+            lines.append("")  # 빈 줄
+            for source in sorted(missing):
+                lines.append(f"> {self.WARNING_TEMPLATE.format(source=source)}")
+        
+        return "\n".join(lines)
+    
+    def to_csv(self, scores: List[MemberScore], missing: Set[str] = None) -> bytes:
+        """UTF-8 BOM(\xef\xbb\xbf)으로 시작. Excel 한글 호환. bytes 반환."""
+        if missing is None:
+            missing = set()
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # 헤더 (판정 금지 용어 준수)
+        writer.writerow([
+            '팀원', '종합 지표', 'Git 지표', '문서 지표', '메신저 지표', 
+            'Git 변경량(원시)', '문서 글자수(원시)', '메시지 발화(원시)', 
+            'Capping 적용', '확인 필요'
+        ])
+        
+        # 종합 지표 기준 내림차순 정렬
+        sorted_scores = sorted(scores, key=lambda x: x.total_score, reverse=True)
+        
+        for s in sorted_scores:
             writer.writerow([
-                '팀원(Author)', '종합 지표(Total)', 'Git 지표', '문서 지표', '메신저 지표', 
-                'Git 변경량(원시)', '문서 글자수(원시)', '메시지 발화(원시)', 
-                'Capping 제한 적용', '확인 필요(Anomaly)'
+                s.author, 
+                round(s.total_score, 4), 
+                round(s.git_score, 4), 
+                round(s.doc_score, 4), 
+                round(s.msg_score, 4), 
+                s.raw_additions, 
+                s.raw_char_count, 
+                s.raw_msg_count, 
+                'O' if s.capping_applied else 'X',
+                ", ".join(s.anomaly_flags) if s.anomaly_flags else ""
             ])
-            
-            # 종합 지표 기준 내림차순 정렬하여 익스포트
-            sorted_scores = sorted(scores, key=lambda x: x.total_score, reverse=True)
-            
-            for s in sorted_scores:
-                writer.writerow([
-                    s.author, 
-                    round(s.total_score, 4), 
-                    round(s.git_score, 4), 
-                    round(s.doc_score, 4), 
-                    round(s.msg_score, 4), 
-                    s.raw_additions, 
-                    s.raw_char_count, 
-                    s.raw_msg_count, 
-                    'O' if s.capping_applied else 'X',
-                    ", ".join(s.anomaly_flags) if s.anomaly_flags else ""
-                ])
+        
+        # 결측 소스 경고
+        if missing:
+            writer.writerow([])  # 빈 행
+            for source in sorted(missing):
+                writer.writerow(["WARNING", self.WARNING_TEMPLATE.format(source=source)])
+        
+        # utf-8-sig BOM 인코딩
+        return output.getvalue().encode('utf-8-sig')
