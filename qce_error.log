@@ -1,0 +1,7 @@
+
+--- 2026-05-30 17:37:40 ---
+Traceback (most recent call last):
+  File "C:\Users\wonhu\AppData\Local\Programs\Python\Python312\Lib\site-packages\matplotlib\backends\backend_qt.py", line 265, in eventFilter
+    def eventFilter(self, source, event):
+    
+KeyboardInterrupt

@@ -1,0 +1,10 @@
+{
+    "python.defaultInterpreterPath": "C:\\Users\\wonhu\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+    "python.analysis.exclude": [
+        "**/node_modules",
+        "**/__pycache__",
+        "**/.git",
+        "**/.pytest_cache",
+        "**/.qce_cache"
+    ]
+}

@@ -11,7 +11,19 @@ _MEDIA_RE = re.compile(r"^\([^)]+\)$")
 _REACTION_RE = re.compile(r"^[ㄱ-ㅎㅏ-ㅣ]+$")
 
 # 1글자 단순 응답 목록 (사용자 편집 불가)
-_ONE_WORD_STOPWORDS = frozenset({"네", "예", "응", "굳", "ㅇ", "오", "어", "음"})
+_ONE_WORD_STOPWORDS = frozenset({
+    # 격식 긍정 + 변이형
+    "네", "넵", "넹", "넴",
+    "예", "옙",
+    # 비격식 긍정 + 변이형
+    "응", "웅", "엉",
+    "어",
+    # 인지/감탄 간투사
+    "음", "오",
+    # 승인 슬랭
+    "굳", "굿",
+})
+
 
 
 def _is_stopword(msg: str) -> bool:
