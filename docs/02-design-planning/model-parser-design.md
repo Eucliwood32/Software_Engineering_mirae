@@ -70,7 +70,7 @@ class ParseResult:                      # FR-3.2 — MessengerParser 출력
 
 | # | 결정 항목 | 확정 내용 | 근거 |
 | :--- | :--- | :--- | :--- |
-| D-1 | 카카오톡 발화 정규식 정본 | **Spec 포맷 `r"^(.+?)\s:\s(.+)$"`** (`작성자 : 메시지`)를 정본으로 채택한다. | 헌법 규칙 1(Spec 우선), `specs/03` §FR-3.1, 정식 경로 구현과 일치 (§9) |
+| D-1 | 카카오톡 발화 정규식 정본 | **브래킷 포맷 `r"^\[(?P<author>.+?)\] \[(?P<ap>오전\|오후) (?P<h>\d{1,2}):(?P<m>\d{2})\] (?P<msg>.*)$"`** (`[작성자] [오전\|오후 H:MM] 메시지`)를 정본으로 채택한다. | 실제 카카오톡 내보내기 포맷, test-plan §4.3 픽스처, `qce/` 구현 일치, 사용자 결정 |
 | D-2 | 슬랙(Slack) CSV 파서 | **범위에서 제외**한다. `specs/03`의 슬랙 관련 기술을 삭제하고 카카오톡 단일 형식으로 축소한다. | RR v1.3 변경이력(4) "슬랙 파싱 삭제", 사용자 결정 |
 | D-3 | 정식 코드베이스 경로 | **`src/models/parsers/`를 정식(운영) 경로**로 확정한다. (생성 시점이 `qce/model/parsing/`보다 앞섬 — §9 참조) | 사용자 결정(선 생성 경로 우선), 실제 앱 실행 경로(`main.py`) |
 | D-4 | HWPX(OWPML) 지원 | Spec 명시 사항으로 **정식 채택**한다. | RR v1.3 FR-1.1·FR-1.2·ASM-3, 변경이력(3) ".hwpx 지원 추가" |
@@ -172,9 +172,9 @@ class ParseResult:                      # FR-3.2 — MessengerParser 출력
   | 용도 | 패턴 | 비고 |
   | :--- | :--- | :--- |
   | 날짜 구분줄 | `r"^\d{4}년 \d{1,2}월 \d{1,2}일"` | 매칭 시 record 아님 → 정상 무시(skip 카운트 아님) |
-  | 발화 분리 | `r"^(.+?)\s:\s(.+)$"` | group(1)=작성자, group(2)=메시지 (`작성자 : 메시지`) |
+  | 발화 분리 | `r"^\[(?P<author>.+?)\] \[(?P<ap>오전\|오후) (?P<h>\d{1,2}):(?P<m>\d{2})\] (?P<msg>.*)$"` | `[작성자] [오전\|오후 H:MM] 메시지` 포맷. 시각은 24h로 변환하여 `MessengerRecord.timestamp`에 기록. |
 
-  > **D-1 정합.** 발화 정규식은 Spec(`specs/03` §FR-3.1) 및 정식 경로(`src/models/parsers/messenger_parser.py`)와 동일한 `작성자 : 메시지` 포맷을 정본으로 한다. 시각(`timestamp`)은 본 포맷에서 별도 캡처되지 않으므로 `MessengerRecord.timestamp`는 빈 문자열로 채워진다.
+  > **D-1 정합.** 브래킷 포맷은 실제 카카오톡 내보내기 파일의 표준 포맷이다. `specs/03`, test-plan §4.3 픽스처(`factories.py`), `qce/model/parsing/messenger_parser.py`, `src/models/parsers/messenger_parser.py` 모두 이 포맷으로 통일됐다.
 
 - **알고리즘:**
   1. `EncodingHandler.read_text(path)`로 파일 전체를 디코드한다(UTF-8 → CP949 순, NFR-3.1). 인코딩 실패 시 에러 마커 dict가 반환되며, 이 경우 빈 `ParseResult`로 귀결시킨다.

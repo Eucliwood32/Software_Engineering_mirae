@@ -1,0 +1,119 @@
+"""L2 통합: AnalysisOrchestrator 비동기 파이프라인 + NFR-1.2 중복 실행 방지.
+
+Orchestrator는 QThreadPool Worker에서 파서·집계를 실행하고 completed Signal로
+결과를 메인 스레드에 넘긴다. qtbot으로 Signal 흐름과 is_analyzing 가드를 검증한다.
+"""
+from __future__ import annotations
+
+import pytest
+
+from qce.controller.analysis_orchestrator import AnalysisOrchestrator
+
+
+@pytest.fixture
+def orchestrator(qtbot):
+    return AnalysisOrchestrator()
+
+
+def test_start_analysis_emits_completed(orchestrator, qtbot, tmp_docx, git_repo, katalk):
+    """start_analysis → Worker 실행 → completed(list[MemberScore]) 발행 (NFR-1.1)."""
+    config = {
+        "doc_paths": [tmp_docx("Alice", "가" * 150)],
+        "git_path": git_repo([
+            {"email": "alice@test.com", "date": "2024-01-01 10:00:00", "add": 40, "del": 1},
+        ]),
+        "msg_path": katalk([("Alice", "회의록 정리했습니다"), ("Bob", "확인했어요")]),
+        "weights": {"git": 0.4, "doc": 0.4, "msg": 0.2},
+    }
+
+    with qtbot.waitSignal(orchestrator.completed, timeout=30000) as blocker:
+        orchestrator.start_analysis(config)
+
+    scores = blocker.args[0]
+    assert scores, "completed Signal로 비어있지 않은 점수 목록이 와야 함"
+    authors = {s.author for s in scores}
+    assert "alice@test.com" in authors
+    # 종료 후 is_analyzing 해제 (재실행 가능 상태)
+    assert orchestrator.is_analyzing is False
+
+
+def test_duplicate_run_blocked(orchestrator, qtbot):
+    """이미 분석 중이면 추가 start_analysis는 무시된다 (NFR-1.2)."""
+    fired = []
+    orchestrator.completed.connect(lambda s: fired.append(s))
+
+    # 분석 진행 중 상태를 강제
+    orchestrator.is_analyzing = True
+    orchestrator.start_analysis({"doc_paths": [], "git_path": "", "msg_path": "",
+                                 "weights": {"git": 0.4, "doc": 0.4, "msg": 0.2}})
+
+    # 가드가 즉시 return 했으므로 Worker가 기동되지 않아 completed 미발행
+    qtbot.wait(300)
+    assert fired == [], "중복 실행 시 새 Worker가 기동되면 안 됨"
+    assert orchestrator.is_analyzing is True
+
+
+def test_partial_source_still_completes(orchestrator, qtbot, git_repo):
+    """일부 소스만 제공(git만) → 예외 없이 completed 발행 (NFR-3.2)."""
+    config = {
+        "doc_paths": [],
+        "git_path": git_repo([
+            {"email": "solo@test.com", "date": "2024-01-01 10:00:00", "add": 20, "del": 0},
+        ]),
+        "msg_path": "",
+        "weights": {"git": 0.4, "doc": 0.4, "msg": 0.2},
+    }
+
+    with qtbot.waitSignal(orchestrator.completed, timeout=30000) as blocker:
+        orchestrator.start_analysis(config)
+
+    scores = blocker.args[0]
+    assert scores
+    # git만 가용 → 종합 점수 = git 정규화 점수
+    for s in scores:
+        assert abs(s.total_score - s.git_score) < 1e-6
+
+
+def test_merge_reaggregation_after_analysis(orchestrator, qtbot, tmp_docx, git_repo, katalk):
+    """1차 분석(전 소스) 완료 후 병합 재집계 → MergeWorker 경로 검증 (FR-1.3)."""
+    config = {
+        "doc_paths": [tmp_docx("Alice", "가" * 100)],
+        "git_path": git_repo([
+            {"email": "alice@test.com", "date": "2024-01-01 10:00:00", "add": 30, "del": 1},
+        ]),
+        "msg_path": katalk([("Alice", "정리 자료입니다"), ("Bob", "확인했어요")]),
+        "weights": {"git": 0.4, "doc": 0.4, "msg": 0.2},
+    }
+    with qtbot.waitSignal(orchestrator.completed, timeout=30000) as b1:
+        orchestrator.start_analysis(config)
+    first = {s.author for s in b1.args[0]}
+    assert "alice@test.com" in first
+
+    # 모든 raw 식별자를 단일 인격으로 N:1 병합
+    mapping = {alias: "Alice" for alias in first}
+    with qtbot.waitSignal(orchestrator.completed, timeout=30000) as b2:
+        orchestrator.start_merge_reaggregation(mapping)
+
+    merged = b2.args[0]
+    assert merged, "병합 재집계 결과가 비어있으면 안 됨"
+    assert all(s.author == "Alice" for s in merged)   # N:1 병합 결과
+    assert orchestrator.is_analyzing is False
+
+
+def test_failure_resets_is_analyzing(orchestrator, qtbot, monkeypatch):
+    """Worker 내부 예외 발생 시 failed 발행 + is_analyzing 해제 (NFR-1.2 비정상 종료 복원)."""
+    # GitAnalyzer.analyze가 예외를 던지도록 강제
+    import qce.controller.analysis_orchestrator as mod
+
+    def boom(self, repo_path):
+        raise RuntimeError("forced failure")
+
+    monkeypatch.setattr(mod.GitAnalyzer, "analyze", boom)
+
+    config = {"doc_paths": [], "git_path": "x", "msg_path": "",
+              "weights": {"git": 0.4, "doc": 0.4, "msg": 0.2}}
+
+    with qtbot.waitSignal(orchestrator.failed, timeout=10000):
+        orchestrator.start_analysis(config)
+
+    assert orchestrator.is_analyzing is False

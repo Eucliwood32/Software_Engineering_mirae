@@ -10,6 +10,7 @@ class CommitStats:
     commits: int
     additions: int
     deletions: int
+    commits_list: list = field(default_factory=list)  # FR-4.2b 빈도 탐지용
 
 
 @dataclass

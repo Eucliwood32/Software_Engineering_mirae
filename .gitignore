@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 가상환경
+.venv/
+venv/
+
+# PyInstaller 빌드 산출물
+build/
+dist/
+
+# 런타임 산출물
+.qce_cache
+.qce_cache.tmp
+qce_error.log
+
+# IDE
+.idea/
+*.swp

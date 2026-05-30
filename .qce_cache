@@ -1,1 +1,16 @@
-{"scores": {"저장한 날짜": {"git": 0.0, "doc": 0.5, "msg": 1.0, "total": 0.3333, "raw_msg_count": 1, "raw_doc_count": 0, "raw_git_additions": 0.0}, "대한": {"git": 0.6314, "doc": 0.5, "msg": 0.0, "total": 0.4209, "raw_msg_count": 0, "raw_doc_count": 0, "raw_git_additions": 7.074116816197362}, "원희": {"git": 1.0, "doc": 0.5, "msg": 1.0, "total": 1.0, "raw_msg_count": 1, "raw_doc_count": 0, "raw_git_additions": 11.204183174786799}}, "weights_used": {"git": 0.6666666666666666, "doc": 0.0, "msg": 0.3333333333333333}, "missing_sources": ["문서"], "analysis_timestamp": "2026-05-28 18:29"}
+{
+  "scores": [
+    {
+      "author": "Alice",
+      "git_score": 0.5,
+      "doc_score": 0.5,
+      "msg_score": 0.5,
+      "total_score": 0.5,
+      "raw_additions": 131,
+      "raw_chars": 100,
+      "raw_messages": 2,
+      "capping_applied": false,
+      "signals": []
+    }
+  ]
+}
