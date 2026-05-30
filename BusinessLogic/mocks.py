@@ -26,8 +26,6 @@ class DocumentParser:
         if self.should_fail:
             raise RuntimeError("Document parse error")
         return {"Alice": 100}
-    def count_shapes(self, path: str) -> int:
-        return 1
 
 class GitAnalyzer:
     def __init__(self, should_fail=False):
@@ -47,12 +45,39 @@ class MessengerParser:
 
 class AliasMapper:
     def merge(self, raw: dict, mapping: dict) -> dict:
-        return {"Alice": {"git": {}, "docs": 100, "msg": 1}}
+        # 매핑 여부에 따라 결과를 다르게 반환하여 L2 통합 테스트 지원
+        if mapping:
+            return {"git": {}, "docs": {"MergedPerson": 100}, "msg": {"MergedPerson": 1}}
+        else:
+            return {"git": {}, "docs": {"Alice": 100}, "msg": {"Alice": 1}}
 
 class ContributionAggregator:
     def aggregate(self, git, docs, msgs, weights) -> List[MemberScore]:
+        if docs and "MergedPerson" in docs:
+            return [MemberScore(author="MergedPerson", total_score=0.99)]
         return [MemberScore(author="Alice", total_score=0.9)]
 
 class CacheManager:
     def save(self, data: dict) -> None:
         pass
+
+# === Mocks for View layer ===
+
+class ResultScreen:
+    def __init__(self):
+        self.rendered_scores = []
+        self.missing = set()
+    def render(self, scores: list[dict], missing: set):
+        self.rendered_scores = scores
+        self.missing = missing
+
+class MainWindow:
+    def __init__(self):
+        self.current_screen = None
+        self.result_screen = ResultScreen()
+    def show_submit(self):
+        self.current_screen = "submit"
+    def show_loading(self):
+        self.current_screen = "loading"
+    def show_result(self):
+        self.current_screen = "result"
