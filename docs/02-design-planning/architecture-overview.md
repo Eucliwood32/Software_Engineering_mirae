@@ -4,7 +4,7 @@
 | 항목 | 내용 |
 | --- | --- |
 | 문서 버전 | v1.2 |
-| 작성일 | 2026-05-28 |
+| 작성일 | 2026-05-31 |
 | 준수 표준 | ISO/IEC/IEEE 29148-2018, ISO/IEC/IEEE 42010 (아키텍처 기술) |
 | 상위 문서 | SRS v2.2, Requirements Record v1.4, Concept of Operations v1.3, Development Constraints v2.0 |
 | 관련 ADR | ADR-0001(MVC), ADR-0002(PyQt6), ADR-0003(kiwipiepy>KoNLPy), ADR-0004(JSON 캐시 vs pickle) |

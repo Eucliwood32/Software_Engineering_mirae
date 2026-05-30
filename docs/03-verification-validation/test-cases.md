@@ -3,8 +3,8 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 문서 버전 | v1.0 |
-| 작성일 | 2026-05-29 |
+| 문서 버전 | v1.1 |
+| 작성일 | 2026-05-31 |
 | 상위 문서 | `test-plan.md` v1.0, Requirements Record v1.3, Architecture Overview v1.0 |
 | 작성 주체 | QCE 개발팀 |
 

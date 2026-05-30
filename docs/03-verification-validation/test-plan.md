@@ -3,8 +3,8 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 문서 버전 | v1.0 |
-| 작성일 | 2026-05-29 |
+| 문서 버전 | v1.1 |
+| 작성일 | 2026-05-31 |
 | 준수 표준 | ISO/IEC/IEEE 29148-2018, ISO/IEC/IEEE 29119 (테스트 프로세스) |
 | 상위 문서 | Requirements Record v1.3, Architecture Overview v1.0, Development Constraints v2.0, ConOps v1.2 |
 | 하위 문서 | `test-cases.md` (개별 케이스 정의) |
