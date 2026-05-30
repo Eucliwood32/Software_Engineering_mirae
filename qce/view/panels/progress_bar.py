@@ -18,9 +18,11 @@ class ProgressBar(QWidget):
         self._bar.setRange(0, 100)
         self._bar.setValue(0)
         layout.addWidget(self._bar)
+        self._running = False
         self.setVisible(False)
 
     def start(self) -> None:
+        self._running = True
         self._bar.setValue(0)
         self.setVisible(True)
 
@@ -28,6 +30,7 @@ class ProgressBar(QWidget):
         self._bar.setValue(max(0, min(100, int(pct))))
 
     def finish(self) -> None:
+        self._running = False
         self.setVisible(False)
 
     # --- 테스트 접근자 ---
@@ -35,4 +38,4 @@ class ProgressBar(QWidget):
         return self._bar.value()
 
     def is_running(self) -> bool:
-        return self.isVisible()
+        return self._running

@@ -40,22 +40,28 @@ def sample_score_dicts() -> list[dict]:
 
 
 def _wire_demo(win: MainWindow, scores: list[dict], missing: set[str]) -> None:
-    """데모용 임시 배선: [분석 시작] → 샘플 렌더. (실제로는 Controller가 수행)"""
+    """데모용 임시 배선: 제출→로딩→결과 3-스크린 흐름. (실제로는 Controller가 수행)"""
     def run() -> None:
-        win.progress_bar.start()
-        win.progress_bar.set_value(100)
-        win.dashboard.render(scores, missing)
-        win.warning_banner.show_missing(missing)
-        win.progress_bar.finish()
+        win.show_loading()
+        win.loading.start()
+        win.loading.set_value(100)
+        win.result.render(scores, missing)
+        win.loading.finish()
+        win.show_result()
         win.flash_status("데모 분석 완료 (샘플 데이터)", 4000)
 
-    win.analysis_panel.analyze_clicked.connect(run)
-    win.analysis_panel.apply_preset("개발 중심")
-    run()  # 기동 직후 한 번 렌더
+    win.submit.analysis_panel.analyze_clicked.connect(run)
+    win.submit.analysis_panel.apply_preset("개발 중심")
+    win.result.new_analysis_requested.connect(win.show_submit)
+    win.result.merge_requested.connect(
+        lambda m: win.flash_status(f"병합 요청(데모, 재집계는 Controller 몫): {m}", 5000)
+    )
+    run()  # 기동 직후 한 번 분석해 결과 화면을 보여준다
 
 
 def _finish_animations(win: MainWindow) -> None:
-    for chart in (win.dashboard.bar, win.dashboard.radar, win.dashboard.scatter):
+    dash = win.result.dashboard
+    for chart in (dash.bar, dash.radar, dash.scatter):
         chart.finish_animation()
 
 
@@ -64,6 +70,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--shot", metavar="PATH", help="오프스크린 렌더 후 PNG로 저장하고 종료")
     parser.add_argument("--missing-msg", action="store_true",
                         help="메신저 소스 결측 시나리오(배너+점선 표시)로 렌더")
+    parser.add_argument("--screen", choices=["submit", "loading", "result"], default="result",
+                        help="--shot 캡처 대상 화면 (기본: result)")
     args = parser.parse_args(argv)
 
     app = QApplication(sys.argv[:1])
@@ -78,6 +86,7 @@ def main(argv: list[str] | None = None) -> int:
         win.show()
         app.processEvents()
         _finish_animations(win)
+        {"submit": win.show_submit, "loading": win.show_loading, "result": win.show_result}[args.screen]()
         app.processEvents()
         pixmap = win.grab()
         pixmap.save(args.shot)
