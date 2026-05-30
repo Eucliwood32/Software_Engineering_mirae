@@ -38,5 +38,5 @@ QCE(Quantitative Contribution Evaluator)는 팀 프로젝트 내에서의 기여
 - **의존성:** Git 2.x (PATH 등록 권장)
 - **금지사항:** `requests`, `urllib`, `pickle`, `socket`, `KoNLPy`(JRE 의존), 외부 LLM API/클라우드 통신 일체 금지.
 
-## 📂 문서 색인
+## 문서 색인
 상세 설계 및 명세는 [INDEX.md](./docs/INDEX.md)를 참고하시기 바랍니다.
