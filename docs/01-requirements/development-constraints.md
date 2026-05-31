@@ -3,10 +3,10 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 문서 버전 | v2.0 |
-| 작성일 | 2026-05-27 |
-| 기준 명세 | Requirements Record v1.5 |
-| 상위 문서 | Requirements Record v1.5 (요구사항 정본), Concept of Operations (ConOps) |
+| 문서 버전 | v2.1 |
+| 작성일 | 2026-06-01 |
+| 기준 명세 | Requirements Record v1.6 |
+| 상위 문서 | Requirements Record v1.6 (요구사항 정본), Concept of Operations (ConOps) |
 | 작성 주체 | QCE 개발팀 (20222047 조원희 · 20247142 이대한 · 20221985 김휘중) |
 
 ---
@@ -25,7 +25,7 @@
 | **C-3** | **에이전트 설치 금지**<br>(No Agent Installation) | 데이터를 수집하기 위해 타 팀원의 PC에 백그라운드 에이전트 등을 설치하는 구조를 배제합니다. QCE는 오직 사용자가 수동으로 적재한 파일만을 읽어 분석합니다. |
 | **C-4** | **엄격한 MVC 아키텍처**<br>(Strict MVC Compliance) | 아키텍처 설계 시 **View → Controller → Model**의 단방향 흐름을 강제합니다. View 계층에서 Model을 직접 `import`하거나 호출하는 것을 엄격히 금지합니다. (ADR-0001) |
 | **C-5** | **Python 스택 및 Target OS**<br>(Environment Constraints) | 개발 언어는 **Python 3.10 이상**을 기준으로 하며, 대상 운영체제는 **Windows 10/11 x64** 환경으로만 한정합니다. (다중 OS 지원을 위한 분기문 작성 지양) |
-| **C-6** | **단일 실행 파일 배포**<br>(Standalone Executable) | 사용자 PC에 별도의 Python 환경이나 라이브러리 설치를 요구하지 않도록, 반드시 `PyInstaller --onefile` 옵션을 활용하여 단일 `.exe` 파일 형태로 빌드 및 배포해야 합니다. |
+| **C-6** | **단일 실행 파일 배포 및 전용 아이콘 적용**<br>(Standalone Executable & Custom Icon) | 사용자 PC에 별도의 Python 환경이나 라이브러리 설치를 요구하지 않도록, 반드시 `PyInstaller --onefile` 옵션을 활용하여 단일 `.exe` 파일 형태로 빌드 및 배포해야 합니다. **이때 앱의 완성도와 식별성을 높이기 위해, 반드시 `--icon` 옵션을 사용하여 시스템 전용 아이콘(`.ico`)을 실행 파일에 포함하여 빌드해야 합니다.** |
 | **C-7** | **외부 JRE 의존성 배제**<br>(No Java Dependency) | 사용자의 사전 환경 구축 부담을 줄이기 위해, 형태소 분석 시 Java 런타임(JRE)을 요구하는 `KoNLPy`(`Kkma`, `Hannanum` 등)의 사용을 전면 금지합니다. 순수 Python 또는 C 확장 기반의 `kiwipiepy`나 `soynlp`만을 사용해야 합니다. |
 | **C-8** | **직렬화 포맷 제한**<br>(No Pickle allowed) | 임의 코드 실행(RCE) 등의 보안 취약점을 방지하기 위해 파일/캐시 직렬화 시 `pickle` 모듈의 사용을 전면 금지합니다. 모든 데이터 직렬화는 `json` 모듈만 사용해야 합니다. |
 | **C-9** | **Git CLI 의존성 대응**<br>(Git CLI Prerequisite) | Git 로컬 저장소 분석을 위해 사용자 OS에 `Git 2.x` CLI가 설치되고 PATH에 등록되어 있어야 합니다. 단, 미설치 환경에서도 앱이 비정상 종료(Crash)되지 않고 기능을 우회할 수 있도록 에러 핸들링이 강제됩니다. |

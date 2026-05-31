@@ -3,10 +3,10 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 문서 버전 | v1.2 |
-| 작성일 | 2026-05-31 |
+| 문서 버전 | v1.3 |
+| 작성일 | 2026-06-01 |
 | 준수 표준 | ISO/IEC/IEEE 29148-2018, ISO/IEC/IEEE 29119 (테스트 프로세스) |
-| 상위 문서 | Requirements Record v1.5, Architecture Overview v1.3, Development Constraints v2.0, ConOps v1.3 |
+| 상위 문서 | Requirements Record v1.6, Architecture Overview v1.3, Development Constraints v2.0, ConOps v1.4 |
 | 하위 문서 | `test-cases.md` (개별 케이스 정의) |
 | 작성 주체 | QCE 개발팀 |
 | 대상 독자 | **사람 개발자 + 자율 구현 에이전트(AI)** |
@@ -55,8 +55,12 @@ QCE의 모든 기능 요구사항(FR)·비기능 요구사항(NFR)·제약(C)이
 | Z-Score 신호 ID | 없음 | RR v1.5에서 본문 헤더 오기(`4.2c`)를 `4.2d`로 정정 | **`FR-4.2d`로 통일**(전 문서 일치) |
 | 신호 예외 처리 ID | 없음 | RR v1.5에서 `FR-4.2c`로 복원(NormalizedSignalsTracker) | **`FR-4.2c`(정상으로 표시).** 확정 체계: 4.2c=예외·4.2d=Z-Score |
 | EW-02 빈도 신호 | 없음 | FR-4.2b | **포함** |
+| 점수 구성요소 노출 | (명시 없음) | RR v1.6 FR-5.1a: 툴팁에 정량적 세부 구성요소(Raw Data) 포함 | **Git 커밋 수·라인 양, 문서 유효 글자수·도형 수, 메신저 유효 문자·발화 횟수를 툴팁/UI에 표시** |
+| 차트 placeholder 문구 | "분석을 실행하면 결과가 표시됩니다." | RR v1.6 FR-5.1: "분석할 데이터가 없습니다." | **"분석할 데이터가 없습니다."** |
+| 가중치 슬라이더 연동 | (명시 없음) | RR v1.6 FR-4.4: 나머지 자동 실시간 연동 + 숫자 표시 | **실시간 비례 재분배·숫자 표기 포함** |
+| 카톡 단독 분석 | (명시 없음) | RR v1.6 FR-3.1: 카톡만 입력해도 정상 동작 + 매핑 목록 누락 없이 표출 | **카카오톡 단독 파이프라인 보장 + 식별자 매핑 100%** |
 
-> 위 표 자체가 회귀 방지 체크리스트다. 구현이 슬랙 파싱·2종 차트로 회귀하면 RR v1.3 위반이다.
+> 위 표 자체가 회귀 방지 체크리스트다. 구현이 슬랙 파싱·2종 차트·구 placeholder 문구로 회귀하면 RR v1.6 위반이다.
 
 ---
 
@@ -263,12 +267,22 @@ def make_katalk(path, lines: list[tuple[str,str]] | list[str],
 from qce.model.types import MemberScore
 def sample_scores(n=4) -> list[MemberScore]:
     return [
-        MemberScore("조원희",0.30,0.20,0.40,0.28,800,1500,120,False,[]),
-        MemberScore("B팀원", 0.55,0.10,0.30,0.31,1000,400,90,True,["EW-01"]),
-        MemberScore("C팀원", 0.40,0.45,0.20,0.29,600,2000,50,False,[]),
-        MemberScore("D팀원", 0.05,0.08,0.05,0.12,50,200,10,False,["ZSCORE"]),
+        MemberScore("조원희",0.30,0.20,0.40,0.28,800,1500,120,False,[],
+                    raw_commits=45, raw_del_lines=300, raw_shapes=12,
+                    raw_valid_chars=8500, raw_valid_messages=95),
+        MemberScore("B팀원", 0.55,0.10,0.30,0.31,1000,400,90,True,["EW-01"],
+                    raw_commits=72, raw_del_lines=450, raw_shapes=5,
+                    raw_valid_chars=2100, raw_valid_messages=68),
+        MemberScore("C팀원", 0.40,0.45,0.20,0.29,600,2000,50,False,[],
+                    raw_commits=30, raw_del_lines=200, raw_shapes=20,
+                    raw_valid_chars=12000, raw_valid_messages=35),
+        MemberScore("D팀원", 0.05,0.08,0.05,0.12,50,200,10,False,["ZSCORE"],
+                    raw_commits=3, raw_del_lines=15, raw_shapes=1,
+                    raw_valid_chars=500, raw_valid_messages=7),
     ][:n]
 ```
+
+> **v1.3 변경.** MemberScore에 정량적 세부 구성요소(Raw Data) 필드가 추가되었다(RR v1.6 §1.4). 커밋 수, 삭제 라인, 도형 수, 유효 글자수, 유효 발화수 등 점수 산출 근거 원시값이 포함되어 툴팁·UI에서 투명하게 확인 가능하다.
 
 ---
 
@@ -348,24 +362,28 @@ STAGE 6  컨트롤러 (← 모든 Model)
 
 STAGE 7  뷰 (← 점수 dict 형태만; View는 plain dict 소비, INV-V1)
          ├ GitMissingDialog      (FR-2.2 UI)
-         ├ AnalysisPanel         (FR-4.4 UI)
-         ├ BarChartWidget        (FR-5.1a)
-         ├ RadarChartWidget      (FR-5.1b)
-         ├ ScatterChartWidget    (FR-5.1c)
+         ├ AnalysisPanel         (FR-4.4 UI — 가중치 실시간 연동·숫자 표기·"작업 종류 별 반영 비율" 헤더)
+         ├ BarChartWidget        (FR-5.1a — 툴팁 원시값 포함 6항목)
+         ├ RadarChartWidget      (FR-5.1b — 꼭짓점 4항목 원시값 포함)
+         ├ ScatterChartWidget    (FR-5.1c — 9항목 원시값 포함)
          ├ WarningBanner         (FR-5.3 UI)
          ├ ProgressBar           (NFR-1.1 UI)
          ├ [FR-5.1d] 차트 12 케이스 — 위 3 차트 GREEN 후 일괄 검증
-         ├ SubmitScreen          (FR-5.5 — 로고·드롭존·AnalysisPanel·분석시작)
+         ├ SubmitScreen          (FR-5.5 — 로고·드롭존·AnalysisPanel·분석시작·입력파일명 표시·초기화)
          ├ LoadingScreen         (FR-5.6 — 진행률)
-         ├ ResultScreen          (FR-5.7 — 대시보드+병합 컨트롤; merge_requested 발행)
-         └ MainWindow            (FR-5.4 — QStackedWidget 3-스크린 전환)
+         ├ ResultScreen          (FR-5.7 — 대시보드+병합 컨트롤; merge_requested 발행; 빈 매핑 OK 차단; Cancel 안전 처리)
+         └ MainWindow            (FR-5.4 — QStackedWidget 3-스크린 전환 + 새 분석 시 입력 초기화)
          # 결과 화면 계정 병합의 '재집계'(FR-5.7 L2)는 STAGE 8로 — Controller+Model 왕복
 
 STAGE 8  통합·시스템
          ├ test_module_isolation (NFR-3.2)
          ├ test_pipeline_missing_source (FR-4.3 E2E)
+         ├ test_katalk_standalone_pipeline (FR-3.1 — 카톡 단독 입력 시 파이프라인 정상 동작 + 매핑 식별자 100%)
          ├ test_merge_reaggregation (FR-5.7 — 결과 화면 병합 매핑 재집계→재정규화, 타 팀원 점수 변동·결정론)
+         ├ test_merge_cancel_preserves_state (FR-5.7 — 병합 취소 시 기존 화면·차트 상태 유지)
+         ├ test_merge_empty_mapping_blocked (FR-5.7 — 매핑 0건 상태에서 OK 버튼 비활성 검증)
          ├ test_screen_navigation (FR-5.4 — 제출→로딩→결과 전환 + 새 분석/병합 전이)
+         ├ test_new_analysis_input_reset (FR-5.4 — [새 분석] 시 문서·메신저·깃 입력 및 표시 초기화 검증)
          └ manual_checklist (시나리오 A/B/C)
 ```
 
@@ -486,6 +504,8 @@ WRITE_OK = {"qce/model/business/report_exporter.py",
 
 > 커버리지 목표는 레이어별로 차등한다: **Model 95% 권장 / Controller 90% / View(로직부) 70%**(렌더 코드는 시각 검증으로 보완).
 
+> **v1.3 추가 게이트.** 카카오톡 단독 입력 파이프라인 정상 동작(FR-3.1), 매핑 빈 상태 OK 차단(FR-5.7), [새 분석] 입력 초기화(FR-5.4), 가중치 실시간 연동(FR-4.4), 실행 파일 아이콘 적용(NFR-4.1)이 G1~G8에 추가 검증 대상으로 포함된다.
+
 ---
 
 ## 9. 트러블슈팅 — 실패 분류 → 조치 (AI 자가수정용)
@@ -494,6 +514,8 @@ WRITE_OK = {"qce/model/business/report_exporter.py",
 | :--- | :--- | :--- |
 | `ZeroDivisionError` in Normalizer | max==min 분기 누락 | `if max==min: return [0.5]*len(v)` (FR-4.1) |
 | 가중치 합 ≠ 1.0 | 결측 재정규화 시 분모 오류 | `w_i/(1-sum(missing))` 후 `round(_,4)`; 합 `±0.0001` 재검 (FR-4.3) |
+| 가중치 슬라이더 조작 시 나머지 안 변함 | 비례 재분배 `redistribute` 미호출 | 슬라이더 `valueChanged` 시 `redistribute(key, new_value, current)` 호출 후 나머지 슬라이더 업데이트 (FR-4.4) |
+| 가중치 숫자 라벨 미표시 | `update_weight_labels` 미호출 | `valueChanged` 핸들러에 라벨 갱신 로직 추가 (FR-4.4) |
 | capping 5000 → 5000 | 임계 비교 `>` vs `>=` 혼동 | `>1000`만 cap, 999/1000 경계 확인 (FR-4.2) |
 | Git 결과 빈 dict 기대인데 예외 전파 | `CalledProcessError`/`FileNotFoundError` 미포획 | try/except로 `{}` 반환 (FR-2.1) |
 | 한글 깨짐 | CP949 폴백 누락 | UTF-8→CP949 순, 둘 다 실패 시 error dict (NFR-3.1) |
@@ -502,6 +524,11 @@ WRITE_OK = {"qce/model/business/report_exporter.py",
 | 정적 게이트 RED, 기능 GREEN | 금지 import/레이어 위반 | 해당 모듈에서 import 제거; 우회 불가 — 설계 수정 |
 | 격리 테스트 RED | 파서 상호 import | 공통 타입을 `types.py`로 끌어올려 의존 제거 (NFR-3.2) |
 | 캐시 손상 후 크래시 | load의 예외 미포획 | `JSONDecodeError/KeyError → remove + 빈상태` (NFR-2.3) |
+| 카톡 단독 입력 시 분석 화면 안 뜸 | 메신저만 가용할 때 파이프라인 실패 | FR-4.3 가중치 재조정 확인 + MessengerParser 결과가 Orchestrator에 전달되는지 확인 (FR-3.1) |
+| 카톡 식별자가 매핑 목록에 미표출 | 메신저 파서 결과가 매핑 후보에서 누락 | AliasMapper에 메신저 소스 식별자도 포함되는지 확인 (FR-3.1/FR-1.3) |
+| 매핑 0건에서 OK 클릭 → 빈 화면 | `_validate_selection` 미구현 | OK 버튼을 매핑 1건 이상 시에만 활성화 (FR-5.7) |
+| 매핑 Cancel 시 기능 전체 사라짐 | Cancel 핸들러가 매핑 컨트롤을 파괴 | Cancel은 매핑만 취소하고 기존 화면·차트 상태 복원 (FR-5.7) |
+| [새 분석] 후 이전 파일 정보 잔존 | `clear_inputs()` 미호출 | `new_analysis_requested` 슬롯에서 `SubmitScreen.clear_inputs()` 호출 (FR-5.4) |
 
 ---
 
@@ -516,7 +543,7 @@ WRITE_OK = {"qce/model/business/report_exporter.py",
 | FR-1.3 | unit/model/business/test_alias_mapper.py + test_alias_extractor.py + ui/test_alias_mapping_dialog.py | L1+L3 |
 | FR-2.1 | unit/model/parsing/test_git_analyzer.py | L1 |
 | FR-2.2 | unit/model/parsing/test_git_health_checker.py + ui/test_git_missing_dialog.py | L1+L3 |
-| FR-3.1 | unit/model/parsing/test_messenger_parser.py | L1 |
+| FR-3.1 | unit/model/parsing/test_messenger_parser.py + integration/test_katalk_standalone_pipeline.py | L1+L2 |
 | FR-3.2 | unit/model/parsing/test_messenger_parser.py | L1 |
 | FR-3.3 | unit/model/parsing/test_stopword_filter.py | L1 |
 | FR-4.1 | unit/model/business/test_normalizer.py | L1 |
@@ -525,18 +552,18 @@ WRITE_OK = {"qce/model/business/report_exporter.py",
 | FR-4.2c | unit/model/business/test_normalized_signals_tracker.py + ui/test_anomaly_signal_panel.py | L1+L3 |
 | FR-4.2d | unit/model/business/test_anomaly_signal_detector.py + ui/test_scatter_chart.py | L1+L3 |
 | FR-4.3 | unit/model/business/test_weight_rebalancer.py + integration/test_pipeline_missing_source.py | L1+L2 |
-| FR-4.4 | unit/model/business/test_weight_preset_manager.py + ui/test_analysis_panel.py | L1+L3 |
-| FR-5.1 | ui/test_*_chart.py (공통 규칙) | L3 |
-| FR-5.1a | ui/test_bar_chart.py | L3 |
-| FR-5.1b | ui/test_radar_chart.py | L3 |
-| FR-5.1c | ui/test_scatter_chart.py | L3 |
+| FR-4.4 | unit/model/business/test_weight_preset_manager.py + ui/test_analysis_panel.py (실시간 연동·숫자 표기·헤더 문구 포함) | L1+L3 |
+| FR-5.1 | ui/test_*_chart.py (공통 규칙 — placeholder 문구 "분석할 데이터가 없습니다." 검증) | L3 |
+| FR-5.1a | ui/test_bar_chart.py (툴팁 원시값 포함 6항목 검증) | L3 |
+| FR-5.1b | ui/test_radar_chart.py (꼭짓점 원시값 포함 4항목 검증) | L3 |
+| FR-5.1c | ui/test_scatter_chart.py (9항목 원시값 포함 검증) | L3 |
 | FR-5.1d | ui/test_chart_acceptance.py (12 케이스) | L3 |
 | FR-5.2 | unit/model/business/test_report_exporter.py | L1 |
 | FR-5.3 | unit/model/business/test_report_exporter.py + ui/test_warning_banner.py | L1+L3 |
-| FR-5.4 | ui/test_main_window.py (화면 전환) | L3 |
-| FR-5.5 | ui/test_submit_screen.py | L3 |
+| FR-5.4 | ui/test_main_window.py (화면 전환) + integration/test_new_analysis_input_reset.py (입력 초기화) | L3+L2 |
+| FR-5.5 | ui/test_submit_screen.py (입력 파일명 표시·"작업 종류 별 반영 비율" 헤더·초기화 포함) | L3 |
 | FR-5.6 | ui/test_loading_screen.py | L3 |
-| FR-5.7 | ui/test_result_screen.py (병합 발행) + integration/test_merge_reaggregation.py (재집계) | L3+L2 |
+| FR-5.7 | ui/test_result_screen.py (병합 발행·빈 매핑 OK 차단·Cancel 안전 처리) + integration/test_merge_reaggregation.py (재집계) + integration/test_merge_cancel_preserves_state.py + integration/test_merge_empty_mapping_blocked.py | L3+L2 |
 | NFR-1.1 | ui/test_async_progress.py | L3 |
 | NFR-1.2 | integration/test_orchestrator.py | L2 |
 | NFR-1.3 | unit/model/business/test_contribution_aggregator.py (결정론) | L1 |
@@ -546,6 +573,7 @@ WRITE_OK = {"qce/model/business/report_exporter.py",
 | NFR-2.4 | unit/model/business/test_cache_manager.py | L1 |
 | NFR-3.1 | unit/model/parsing/test_encoding_handler.py | L1 |
 | NFR-3.2 | integration/test_module_isolation.py + static/test_mvc_layering.py | L2+L0 |
+| NFR-4.1 | system/test_exe_icon.py (실행 파일 아이콘 적용 검증) | L4 |
 | C-1~C-9 | static/* (가능한 항목) + 빌드 단계 | L0 |
 
 ---
@@ -553,9 +581,11 @@ WRITE_OK = {"qce/model/business/report_exporter.py",
 ## 11. 위험·한계
 
 - **HWPX 스키마 변동:** HWPX 메타/본문 스키마는 버전별 차이가 있다. 팩토리·파서가 같은 스키마 가정에 합의해야 하며, 실제 한글 파일과 차이 시 §4.1 팩토리와 파서를 동시 수정한다.
-- **KakaoTalk 형식 변동:** §4.3에 형식을 고정했다. 실제 export와 다르면 회귀로 간주하고 동기 수정.
-- **차트 렌더 검증 한계:** matplotlib 픽셀 단위 비교는 불안정하므로, **데이터 계약(축 레이블·평균선 Y값·점 크기 매핑·Signal 발행)** 을 검증하고 시각적 완성도는 L4 수동으로 보완한다.
+- **KakaoTalk 형식 변동:** §4.3에 형식을 고정했다. 실제 export와 다르면 회귀로 간주하고 동기 수정. 카톡 단독 입력 시 파이프라인 정상 동작과 매핑 식별자 100% 표출이 보장되어야 한다(RR v1.6 FR-3.1).
+- **차트 렌더 검증 한계:** matplotlib 픽셀 단위 비교는 불안정하므로, **데이터 계약(축 레이블·평균선 Y값·점 크기 매핑·Signal 발행·툴팁 원시값 항목)** 을 검증하고 시각적 완성도는 L4 수동으로 보완한다.
 - **pytest-qt headless:** CI에서 `QT_QPA_PLATFORM=offscreen` 필요. 일부 애니메이션 타이밍은 `qtbot.waitUntil`로 폴링.
+- **가중치 슬라이더 연동:** 비례 재분배(redistribute) 로직은 나머지 두 축의 합이 0인 경우 균등 분배로 fallback하며, 부동소수점 오차로 인해 합이 정확히 1.0이 아닐 수 있다(±0.0001 허용). 모든 연산은 결정론적이어야 한다(NFR-1.3).
+- **실행 파일 아이콘:** PyInstaller `--icon` 옵션으로 `.ico` 파일이 빌드 시 적용되어야 한다. Windows 탐색기 캐시로 인해 아이콘이 즉시 반영되지 않을 수 있다(NFR-4.1).
 
 ---
 
@@ -566,3 +596,4 @@ WRITE_OK = {"qce/model/business/report_exporter.py",
 | v1.0 | 2026-05-29 | 최초 작성. RR v1.3·architecture v1.0 기준. AI TDD 루프, 정적 게이트(C 제약 코드화), 빌드 DAG, 픽스처 팩토리 계약, 추적 매트릭스 포함. SRS v2.0과의 차이 §1.3에 해소. | QCE 개발팀 |
 | **v1.1** | **2026-05-31** | **RR v1.4·view-design v1.3 동기화: §6 STAGE 7에 SubmitScreen(FR-5.5)·LoadingScreen(FR-5.6)·ResultScreen(FR-5.7)·MainWindow(FR-5.4)·ProgressBar 추가, STAGE 8에 결과 화면 병합 재집계(test_merge_reaggregation)·화면 전환(test_screen_navigation) 통합 테스트 추가. §10 추적 매트릭스에 FR-5.4~5.7 행 추가. FR-5.7 재집계는 Controller+Model 왕복(L2)으로 분류.** | QCE 개발팀 (이대한) |
 | **v1.2** | **2026-05-31** | **구 SRS.md 폐지 반영(A1~A4). §1.3 차이 해소표에 신호 번호 정합 행 갱신: Z-Score=FR-4.2d 통일(구 RR 본문 오기 정정), 신호 예외 처리=FR-4.2c 복원. §10 요구사항→테스트 매핑에 FR-4.2c(test_normalized_signals_tracker.py + ui/test_anomaly_signal_panel.py) 행 추가, FR-1.3에 test_alias_extractor.py·ui/test_alias_mapping_dialog.py 추가. (SRS.md는 보조 문서로 폐지, RR이 단일 정본.)** | QCE 개발팀 |
+| **v1.3** | **2026-06-01** | **RR v1.6 사용자 피드백(11대 UI/UX 결함 및 기능 방어 요소) 반영. (1) §1.3 차이 해소표에 점수 구성요소 노출·placeholder 문구·가중치 연동·카톡 단독 분석 행 추가. (2) §4.4 MemberScore 픽스처에 정량적 세부 구성요소(raw_commits·raw_del_lines·raw_shapes·raw_valid_chars·raw_valid_messages) 추가. (3) §6 STAGE 7에 가중치 실시간 연동·숫자 표기·"작업 종류 별 반영 비율" 헤더(FR-4.4), 툴팁 원시값 포함(FR-5.1a/b/c), 입력 파일명 표시·초기화(FR-5.5), 빈 매핑 OK 차단·Cancel 안전 처리(FR-5.7) 반영. STAGE 8에 test_katalk_standalone_pipeline(FR-3.1), test_merge_cancel_preserves_state·test_merge_empty_mapping_blocked(FR-5.7), test_new_analysis_input_reset(FR-5.4) 추가. (4) §9 트러블슈팅에 가중치 연동 미동작·카톡 단독 파이프라인 실패·매핑 빈 상태 OK·Cancel 기능 파괴·새 분석 입력 잔존 등 5건 추가. (5) §10 추적 매트릭스에 FR-3.1 카톡 통합 테스트, FR-4.4 실시간 연동·숫자 표기, FR-5.1 placeholder 문구 변경, FR-5.4 입력 초기화, FR-5.5 파일명 표시·헤더 문구, FR-5.7 빈 매핑 차단·Cancel 안전 처리 반영. NFR-4.1 실행 파일 아이콘 행 신설. (6) §11 위험·한계에 가중치 연동 부동소수점 주의·실행 파일 아이콘 캐시 사항 추가. 상위 문서 RR v1.6·ConOps v1.4로 갱신.** | QCE 개발팀 |

@@ -3,8 +3,8 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 문서 버전 | v1.2 |
-| 작성일 | 2026-05-31 |
+| 문서 버전 | v1.3 |
+| 작성일 | 2026-06-01 |
 | 상위 문서 | Architecture Overview v1.3, Requirements Record v1.5, View Design v1.4 |
 | 관련 모듈 | `AppController`, `AnalysisOrchestrator` |
 | 작성 주체 | QCE 개발팀 (김휘중) |
@@ -80,7 +80,7 @@ Controller 레이어는 크게 전역 상태와 라우팅을 담당하는 `AppCo
           """ResultScreen.merge_requested 수신 → show_loading() → 재집계 (FR-5.7, §6 참조)"""
   
       def on_new_analysis_requested(self) -> None:
-          """ResultScreen.new_analysis_requested 수신 → 상태 초기화 → show_submit()"""
+        """ResultScreen.new_analysis_requested 수신 → 이전 적재 파일명/저장소 등 상태 완전 초기화(리셋) 명령 하달 → show_submit()"""
 
       # --- 신규: 신호 예외 처리 (FR-4.2c) ---
       def on_signal_dismissed(self, author: str, signal_type: str, ref: str) -> None:
@@ -156,7 +156,7 @@ Controller 레이어는 크게 전역 상태와 라우팅을 담당하는 `AppCo
 `AnalysisOrchestrator` 내의 Worker Thread는 다음 순서로 Model 컴포넌트들을 제어한다.
 
 1. **데이터 수집 시도:** `DocumentParser`, `GitAnalyzer`, `MessengerParser` 비동기 혹은 순차 호출.
-2. **결측 및 에러 방어:** 파서 내부에서 에러가 발생하거나 파일이 없으면 예외를 상위로 전파하지 않고 `None` 혹은 빈 데이터를 반환하도록 한다. (NFR-3.2 격리 원칙). 각 파서의 원시 결과를 Orchestrator 내부에 보유한다.
+2. **결측 및 에러 방어:** 파서 내부에서 에러가 발생하거나 파일이 없으면 예외를 상위로 전파하지 않고 None 혹은 빈 데이터를 반환하도록 한다. (NFR-3.2 격리 원칙). 각 파서의 원시 결과를 Orchestrator 내부에 보유하며, **특히 카카오톡 등 단일 데이터 소스만 입력된 경우에도 파이프라인이 붕괴하지 않고 정상적으로 집계 단계로 넘어가도록 철저히 보장한다.**
 3. **식별자 통합 (FR-1.3 개정):**
    - **1차 분석:** `AliasMapper`에 **항등 매핑**을 전달하여 각 식별자를 독립 인물로 산출한다. 분석-전 매핑 모달(alias_mapping_requested)은 폐기되었다.
    - **병합 재집계(FR-5.7):** 결과 화면에서 조장이 병합 매핑을 제출하면 파서를 재실행하지 않고, 보유 중인 원시 지표에 새 매핑을 적용해 `AliasMapper.merge(raw, mapping)` → `ContributionAggregator.aggregate(...)` 경로를 재실행한다. (§6 참조)
@@ -222,3 +222,4 @@ ResultScreen.merge_requested(mapping={alias → member})
 | v1.0 | 2026-05-29 | 최초 작성. `AppController`/`AnalysisOrchestrator` 기본 설계. | QCE 개발팀 |
 | **v1.1** | **2026-05-31** | **(1) 3-스크린 전환 조율 추가 (FR-5.4). (2) 분석-전 매핑 모달 폐기·1차 분석 항등 매핑으로 FR-1.3 개정 반영. (3) 결과 화면 계정 병합 재집계 흐름 신규 §6 추가 (FR-5.7). (4) View 타입 격리(INV-V1) — asdict 직렬화 명시. (5) AnalysisOrchestrator에 원시 지표 보유 책임 추가. (6) AppController 신호 connect 목록 갱신 (merge_requested, new_analysis_requested 추가, alias_mapping_requested 제거). (7) RTM §5 갱신 (FR-5.4, FR-5.7, NFR-2.4, INV-V1, FR-1.3 개정). (8) 상위 문서를 Architecture v1.2·RR v1.4·View Design v1.3로 갱신.** | QCE 개발팀 |
 | **v1.2** | **2026-05-31** | **구 SRS.md 폐지 반영 — 신호 예외 처리·신원 추천 배선 추가. (1) §2.1 인터페이스에 `on_signal_dismissed`·`_render_results` 추가 및 배선 설명(c) — `NormalizedSignalsTracker`(FR-4.2c) 보유, "정상으로 표시"는 재집계 없이 표시만 갱신(점수 불변, STR-7), 새 분석 시 `tracker.clear()`. (2) `_render_results`가 `AliasExtractor.suggest_groups`로 병합 후보를 만들어 `set_suggested_mapping`으로 전달(FR-1.3, 자동병합 아님). (3) 신호 connect 목록에 `ResultScreen.signal_dismissed` 추가. (4) RTM §5에 FR-4.2c 행 추가, FR-1.3 행에 추천 명시. (5) 상위 문서를 Architecture v1.3·RR v1.5·View Design v1.4로 갱신.** | QCE 개발팀 |
+| v1.3 | 2026-06-01 | 사용자 피드백(UX 버그 개선) 반영: (1) §2.1 AppController의 on_new_analysis_requested 시그니처에 [새 분석] 진입 시 파일명/저장소 등 이전 뷰 데이터의 완전 초기화(리셋) 제어 책임 명문화. (2) §4 파이프라인 제어 원칙에 카카오톡 등 단일 소스 입력 시의 파이프라인 정상 구동 보장 명시. | QCE 개발팀 |

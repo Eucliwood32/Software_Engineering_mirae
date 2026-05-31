@@ -3,9 +3,9 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 문서 버전 | v1.2 |
-| 작성일 | 2026-05-31 |
-| 상위 문서 | `test-plan.md` v1.2, Requirements Record v1.5, Architecture Overview v1.3 |
+| 문서 버전 | v1.3 |
+| 작성일 | 2026-06-01 |
+| 상위 문서 | `test-plan.md` v1.3, Requirements Record v1.6, Architecture Overview v1.3 |
 | 작성 주체 | QCE 개발팀 |
 
 ---
@@ -239,6 +239,27 @@ class StopwordFilter:                        # FR-3.3
 | TC-FR-3.1-03 | P0 | L1 | `katalk(enc="cp949")` 한글 메시지 | 한글 무손상 | CP949 |
 | TC-FR-3.1-04 | P1 | L1 | 날짜 구분줄 포함 | 날짜줄은 record 아님(발화만 records) | 형식 계약 |
 | TC-FR-3.1-05 | P1 | L1 | 메시지에 콜론·대괄호 포함 | author/message 경계 정확(첫 패턴만) | 경계 견고성 |
+| TC-FR-3.1-06 | P0 | L2 | 카카오톡 로그만 입력(Git·문서 없음) | 앱이 멈추지 않고 파이프라인 정상 작동, 분석 결과 화면 표시 | 카톡 단독 분석 |
+| TC-FR-3.1-07 | P0 | L2 | 카카오톡 로그 파싱 후 매핑 화면 | 추출된 모든 발화자 식별자가 병합(매핑) 목록에 누락 없이 표출 | 식별자 매핑 100% |
+
+```python
+def test_katalk_standalone_pipeline(katalk):                # TC-FR-3.1-06
+    """카카오톡만 입력해도 파이프라인이 정상 동작하고 분석 화면이 표시된다."""
+    path = katalk([("A","회의 시작"), ("B","확인"), ("A","수고")])
+    # Orchestrator에 msg만 전달, git=None, docs=None
+    result = AnalysisOrchestrator().run(git_path=None, doc_paths=[], msg_path=path,
+                                        weights={"git":0.4,"doc":0.4,"msg":0.2})
+    assert result is not None  # 결과가 반환됨(빈 화면이 아님)
+    assert any(s.author in ("A","B") for s in result)
+
+def test_katalk_identifiers_in_mapping(katalk):             # TC-FR-3.1-07
+    """카톡에서 추출된 발화자가 매핑 후보에 빠짐없이 표출된다."""
+    path = katalk([("Alice","안녕"), ("Bob","ㅇㅇ"), ("Charlie","네")])
+    result = MessengerParser().parse(path)
+    authors = {r.author for r in result.records}
+    # 매핑 후보 목록에 파서가 추출한 모든 author가 포함되어야 함
+    assert {"Alice","Bob","Charlie"}.issubset(authors)
+```
 
 ## FR-3.2 오염 줄 방어적 Skip
 
@@ -474,6 +495,33 @@ class WeightPresetManager:                   # FR-4.4
 | TC-FR-4.4-07 | P0 | L3 | 합 1.5로 슬라이더 설정 | [분석 시작] disabled + 경고 "가중치 합계가 1.00이어야 합니다. 현재: 1.50" | 비활성+경고 |
 | TC-FR-4.4-08 | P0 | L3 | 합 1.0 | [분석 시작] enabled | 활성 |
 | TC-FR-4.4-09 | P1 | L3 | 슬라이더 step | 0.05 단위로만 이동(범위 0.00~1.00) | step |
+| TC-FR-4.4-15 | P0 | L3 | Git 슬라이더를 0.70으로 조작 | 나머지(문서·메신저) 슬라이더가 실시간으로 자동 연동되어 합 1.0 유지, 상대 비율 보존 | 실시간 연동 |
+| TC-FR-4.4-16 | P0 | L3 | 슬라이더 조작 후 | 각 슬라이더 옆에 현재 가중치 값이 숫자(예: "0.70")로 표시됨 | 숫자 표시 |
+| TC-FR-4.4-17 | P0 | L3 | 가중치 슬라이더 영역 상단 | "작업 종류 별 반영 비율" 설명 문구가 표시됨 | 헤더 문구 |
+| TC-FR-4.4-18 | P1 | L3 | 슬라이더 3개 연속 조작 | 모든 조작 후 합 1.0±0.0001, 숫자 라벨이 슬라이더 값과 일치 | 연동 일관성 |
+
+```python
+def test_weight_slider_realtime_sync(qtbot):               # TC-FR-4.4-15
+    ap = AnalysisPanel(); qtbot.addWidget(ap)
+    ap.apply_preset("균형 설정")  # 0.40/0.40/0.20
+    # Git 슬라이더를 0.70으로 변경
+    ap.set_slider("git", 0.70)
+    w = ap.current_weights()
+    assert abs(w["git"] - 0.70) < 1e-2
+    assert abs(sum(w.values()) - 1.0) < 1e-4   # 합 1.0 유지
+    # 나머지가 상대 비율 보존: doc:msg = 2:1
+    assert abs(w["doc"] / max(w["msg"], 1e-9) - 2.0) < 0.5
+
+def test_weight_numeric_label(qtbot):                       # TC-FR-4.4-16
+    ap = AnalysisPanel(); qtbot.addWidget(ap)
+    ap.apply_preset("개발 중심")
+    labels = ap.weight_label_texts()   # {"git":"0.60", "doc":"0.25", "msg":"0.15"}
+    assert labels["git"] == "0.60" and labels["doc"] == "0.25" and labels["msg"] == "0.15"
+
+def test_weight_area_header_label(qtbot):                   # TC-FR-4.4-17
+    ap = AnalysisPanel(); qtbot.addWidget(ap)
+    assert "작업 종류 별 반영 비율" in ap.header_text()
+```
 
 ---
 
@@ -483,7 +531,7 @@ class WeightPresetManager:                   # FR-4.4
 
 | TC-ID | P | L | 절차 | 기대 | 근거 |
 | :-- | :- | :- | :-- | :-- | :-- |
-| TC-FR-5.1-01 | P0 | L3 | 분석 미실행 상태 | 각 차트 패널에 "분석을 실행하면 결과가 표시됩니다." | placeholder |
+| TC-FR-5.1-01 | P0 | L3 | 분석 미실행 상태 | 각 차트 패널에 **"분석할 데이터가 없습니다."** 안내 문구 표시 | placeholder |
 | TC-FR-5.1-02 | P0 | L0 | 정적: 차트 위젯 상호 직접 참조 | 위젯 간 직접 import/참조 없음, Signal/Callback만 | 위젯 분리 |
 | TC-FR-5.1-03 | P0 | L3 | 분석 완료 트리거 | 막대·레이더·산점도 **동시 갱신** | 동시 갱신 |
 
@@ -493,13 +541,16 @@ class WeightPresetManager:                   # FR-4.4
 | :-- | :- | :- | :-- | :-- |
 | TC-FR-5.1a-01 | P0 | L3 | 축 | X=팀원명, Y=종합지표, **Y범위 0.0~1.0 고정**, 그리드 0.2 |
 | TC-FR-5.1a-02 | P0 | L3 | 색상 | 1위 강조색 + 나머지 기본색 |
-| TC-FR-5.1a-03 | P0 | L3 | hover 툴팁 6항목 | 팀원명/Git/문서/메신저/종합/Capping 여부 |
+| TC-FR-5.1a-03 | P0 | L3 | hover 툴팁 6항목 | 팀원명 / Git 정규화 점수(**및 원시 추가 라인 수 등 구성요소**) / 문서 정규화 점수(**및 원시 글자수 등 구성요소**) / 메신저 정규화 점수(**및 원시 유효 발화수 등 구성요소**) / 종합 기여 지표 / Capping 발동 여부 |
 | TC-FR-5.1a-04 | P1 | L3 | 툴팁 위치 | 우측상단 오프셋, 경계 시 좌측 반전 |
 | TC-FR-5.1a-05 | P0 | L3 | 팀 평균선 | 수평 점선 + "팀 평균: X.XX", Y=산술평균±0.0001 |
 | TC-FR-5.1a-06 | P0 | L3 | 막대 상단 라벨 | 소수점 2자리 수치 |
 | TC-FR-5.1a-07 | P0 | L3 | 애니메이션 | 하단→최종, 20프레임·30ms |
 | TC-FR-5.1a-08 | P0 | L3 | 애니 종료 후 높이 | 종합지표 ±0.001 |
 | TC-FR-5.1a-09 | P1 | L3 | 애니 중 hover | 비활성, 완료 후 활성 |
+| TC-FR-5.1a-10 | P0 | L3 | 툴팁 원시값 | 툴팁에 Git 원시 추가 라인 수, 문서 원시 글자수, 메신저 원시 발화 수가 각각 숫자로 표시됨 |
+
+> **v1.3 변경(점수 구성요소 노출).** RR v1.6에 따라 막대 차트 툴팁의 6항목에 각 점수의 정량적 세부 구성요소(Raw Data)가 포함된다. Git 정규화 점수 옆에 원시 추가 라인 수, 문서 정규화 점수 옆에 원시 글자수, 메신저 정규화 점수 옆에 원시 유효 발화 수가 함께 표시되어야 한다.
 
 ## FR-5.1b 레이더 차트
 
@@ -627,6 +678,31 @@ def test_no_verdict_wording():                             # TC-FR-5.2-04
 | TC-FR-5.4-04 | P1 | L3 | 로딩 중 오류 → `show_submit()` | 현재 화면 == 제출 | 오류 복귀 |
 | TC-FR-5.4-05 | P0 | L3 | 결과 화면 [새 분석] → `new_analysis_requested` | Signal 발행, 제출 화면 복귀 | 새 분석 |
 | TC-FR-5.4-06 | P1 | L3 | 캐시 단독 로드 후 기동 | 즉시 결과 화면 표시(NFR-2.4) | 캐시 진입 |
+| TC-FR-5.4-07 | P0 | L2 | [새 분석] 후 제출 화면 복귀 | 이전에 입력한 문서 파일, 메신저 파일, 깃 저장소 경로 및 화면 표시 상태가 **모두 초기화**됨 | 입력 초기화 |
+| TC-FR-5.4-08 | P0 | L3 | [새 분석] 후 제출 화면의 입력 표시 | 문서·메신저·깃 입력 표시가 "없음"으로 복귀, 적재 피드백 초기화 | 표시 초기화 |
+
+```python
+def test_new_analysis_resets_inputs(qtbot):                 # TC-FR-5.4-07
+    mw = MainWindow(); qtbot.addWidget(mw)
+    # 파일 적재 시뮬레이션
+    mw.submit._doc_paths = ["a.docx", "b.pptx"]
+    mw.submit._msg_path = "chat.txt"
+    mw.submit._git_repo = "C:/repo"
+    # 새 분석 실행
+    mw.show_submit()  # new_analysis_requested → show_submit
+    mw.submit.clear_inputs()
+    assert mw.submit._doc_paths == []
+    assert mw.submit._msg_path is None
+    assert mw.submit._git_repo is None
+
+def test_new_analysis_resets_display(qtbot):                # TC-FR-5.4-08
+    ss = SubmitScreen(); qtbot.addWidget(ss)
+    ss._doc_paths = ["a.docx"]; ss._msg_path = "chat.txt"; ss._git_repo = "repo"
+    ss.clear_inputs()
+    assert "없음" in ss.git_display_text()
+    assert "없음" in ss.doc_display_text()
+    assert "없음" in ss.msg_display_text()
+```
 
 ## FR-5.5 메인(제출) 화면
 
@@ -637,6 +713,23 @@ def test_no_verdict_wording():                             # TC-FR-5.2-04
 | TC-FR-5.5-03 | P0 | L3 | `_handle_dropped_paths(["chat.txt"])` | `messenger_dropped`=="chat.txt" | 카톡 드롭 |
 | TC-FR-5.5-04 | P1 | L3 | 문서 3개 적재 | 적재 피드백 문자열에 "3" 포함 | 적재 피드백 |
 | TC-FR-5.5-05 | P0 | L3 | AnalysisPanel 합계 ≠ 1.0 | [분석 시작] disabled (FR-4.4 슬롯) | 가중치 검증 |
+| TC-FR-5.5-06 | P0 | L3 | Git 저장소 선택 후 | 선택된 Git 저장소 이름이 화면에 표시됨 | 깃 저장소 표시 |
+| TC-FR-5.5-07 | P0 | L3 | 문서 파일 적재 후 | 입력된 문서 파일명이 화면에 표시됨 | 문서 파일명 표시 |
+| TC-FR-5.5-08 | P0 | L3 | 메신저 파일 적재 후 | 입력된 메신저 파일명이 화면에 표시됨 | 메신저 파일명 표시 |
+| TC-FR-5.5-09 | P0 | L3 | 입력 없는 상태 | Git 저장소·문서·메신저 각각 "없음"으로 표시됨 | 미입력 표시 |
+
+```python
+def test_submit_shows_git_repo_name(qtbot):                # TC-FR-5.5-06
+    ss = SubmitScreen(); qtbot.addWidget(ss)
+    ss.set_git_repo("C:/Users/test/my-project")
+    assert "my-project" in ss.git_display_text()
+
+def test_submit_shows_no_input(qtbot):                     # TC-FR-5.5-09
+    ss = SubmitScreen(); qtbot.addWidget(ss)
+    assert "없음" in ss.git_display_text()
+    assert "없음" in ss.doc_display_text()
+    assert "없음" in ss.msg_display_text()
+```
 
 ## FR-5.6 분석 로딩 화면
 
@@ -664,6 +757,10 @@ def test_no_verdict_wording():                             # TC-FR-5.2-04
 | TC-FR-5.7-04 | P1 | L2 | 병합 해제(분리) 매핑으로 재집계 | 분리 전 상태와 동일 결과 | 병합 취소 |
 | TC-FR-5.7-05 | P0 | L2 | 동일 병합 입력 2회 재집계 | 결과 완전 일치(NFR-1.3) | 결정론 |
 | TC-FR-5.7-06 | P1 | L2 | 재집계 진행 중 추가 병합 요청 | `is_analyzing` 가드로 차단(NFR-1.2) | 중복 차단 |
+| TC-FR-5.7-07 | P0 | L3 | 매핑 대상을 **하나도 선택하지 않은** 상태에서 OK 클릭 | OK 버튼이 비활성(disabled)이어서 눌리지 않음. 빈 화면 출력 방지 | 빈 매핑 차단 |
+| TC-FR-5.7-08 | P0 | L3 | 매핑 기능에서 **Cancel(취소)** 버튼 클릭 | 매핑만 취소되고 매핑 기능 자체는 사라지지 않음. 기존 차트·결과 화면 상태 유지 | Cancel 안전 처리 |
+| TC-FR-5.7-09 | P0 | L3 | 매핑 1건 이상 선택 후 | OK 버튼이 활성(enabled)으로 전환 | OK 활성 조건 |
+| TC-FR-5.7-10 | P1 | L3 | Cancel 후 다시 매핑 시도 | 매핑 컨트롤이 정상적으로 사용 가능(이전 Cancel로 파괴되지 않음) | Cancel 후 재사용 |
 
 ```python
 def test_result_merge_emits_signal(qtbot):                 # TC-FR-5.7-02
@@ -679,9 +776,33 @@ def test_result_merge_emits_signal(qtbot):                 # TC-FR-5.7-02
 def test_merge_reaggregation_changes_others(...):          # TC-FR-5.7-03 (L2, Controller+Model)
     # 두 계정 병합 → 재정규화로 나머지 팀원 정규화 점수가 병합 전과 달라짐을 검증
     ...
+
+def test_empty_mapping_ok_disabled(qtbot):                  # TC-FR-5.7-07
+    rs = ResultScreen(); qtbot.addWidget(rs)
+    rs.render(sample_score_dicts(4), set())
+    # 아무것도 선택하지 않은 상태
+    assert not rs.merge.ok_button.isEnabled(), "매핑 0건에서 OK 버튼이 활성화되면 안 됨"
+
+def test_cancel_preserves_state(qtbot):                     # TC-FR-5.7-08
+    rs = ResultScreen(); qtbot.addWidget(rs)
+    rs.render(sample_score_dicts(4), set())
+    chart_data_before = rs.dashboard.bar.bar_heights()
+    rs.merge._cancel()  # Cancel 클릭
+    # 매핑 기능이 사라지지 않아야 함
+    assert rs.merge.isVisible() or rs.merge_button.isEnabled()
+    # 차트 상태가 유지되어야 함
+    assert rs.dashboard.bar.bar_heights() == chart_data_before
+
+def test_mapping_one_selection_enables_ok(qtbot):           # TC-FR-5.7-09
+    rs = ResultScreen(); qtbot.addWidget(rs)
+    rs.render(sample_score_dicts(4), set())
+    assert not rs.merge.ok_button.isEnabled()
+    # 1건 이상 매핑
+    rs.merge.combo_for("daehan.lee").setCurrentText("이대한")
+    assert rs.merge.ok_button.isEnabled()
 ```
 
-> **레이어 책임.** TC-FR-5.7-01·02는 View(L3, 이대한). TC-FR-5.7-03~06은 재집계 경로로 Controller+Model(L2)이며, AliasMapper·ContributionAggregator·AnalysisOrchestrator의 병합 재호출 지원에 의존한다(controller-design.md 담당자 협의 대상).
+> **레이어 책임.** TC-FR-5.7-01·02·07~10은 View(L3, 이대한). TC-FR-5.7-03~06은 재집계 경로로 Controller+Model(L2)이며, AliasMapper·ContributionAggregator·AnalysisOrchestrator의 병합 재호출 지원에 의존한다(controller-design.md 담당자 협의 대상).
 
 ---
 
@@ -865,15 +986,22 @@ def test_isolation_one_module_fails(monkeypatch):          # TC-NFR-3.2-03
 # 부록 A. 수동 시스템 테스트 체크리스트 (L4 — `system/manual_checklist.md`)
 
 ### 시나리오 A — 학기말 종합 평가 (메인)
-- [ ] A-01 `QCE.exe` 더블클릭 → 메인 윈도우(팀원 패널/드롭영역/신호영역) 표시
-- [ ] A-02 .pptx/.docx/.hwpx 8개 Drag&Drop → "8/8 적재 완료"
-- [ ] A-03 Git 저장소 선택 → 커밋 수집(500커밋 ≤60s 체감)
-- [ ] A-04 카톡 .txt 적재 → 자동 불용어 적용, 사용자 편집 UI **없음** 확인
-- [ ] A-05 매핑 다이얼로그에 전 소스 식별자 노출 → N:1 매핑
+- [ ] A-01 `QCE.exe` 더블클릭 → 메인 윈도우(팀원 패널/드롭영역/신호영역) 표시, **전용 아이콘 적용 확인(NFR-4.1)**
+- [ ] A-02 .pptx/.docx/.hwpx 8개 Drag&Drop → "8/8 적재 완료", **입력된 문서 파일명 표시 확인**
+- [ ] A-03 Git 저장소 선택 → 커밋 수집(500커밋 ≤60s 체감), **선택된 저장소 이름 표시 확인**
+- [ ] A-04 카톡 .txt 적재 → 자동 불용어 적용, 사용자 편집 UI **없음** 확인, **입력된 메신저 파일명 표시 확인**
+- [ ] A-04a **카톡만 단독 입력** 후 [분석 시작] → 앱이 멈추지 않고 분석 결과 화면 정상 표시
+- [ ] A-05 결과 화면 매핑 컨트롤에 전 소스 식별자 노출(**카톡 발화자 포함**) → N:1 매핑
+- [ ] A-05a 매핑 **0건** 상태에서 OK 버튼 **비활성** 확인
+- [ ] A-05b 매핑 기능에서 **Cancel** 클릭 → 매핑만 취소되고 **기존 차트·결과 화면 유지** 확인
 - [ ] A-06 [분석 시작] → 진행률 표시 → 완료
-- [ ] A-07 막대/레이더/산점도 3종 동시 표시 + 인터랙션(툴팁/토글/클릭연동)
+- [ ] A-06a **가중치 슬라이더** 조작 시 나머지 슬라이더가 **실시간 자동 연동**, 현재 가중치 **숫자 표시** 확인
+- [ ] A-06b 가중치 슬라이더 영역 상단에 **"작업 종류 별 반영 비율"** 문구 표시 확인
+- [ ] A-07 막대/레이더/산점도 3종 동시 표시 + 인터랙션(툴팁에 **원시값 구성요소 포함**/토글/클릭연동)
+- [ ] A-07a 분석 미실행 상태에서 차트 패널에 **"분석할 데이터가 없습니다."** 표시 확인
 - [ ] A-08 신호 영역에 EW-01/EW-02/Z-Score 신호 표시
-- [ ] A-09 종료 후 분석 데이터 휘발(재실행 시 재적재 필요), 가중치 프리셋은 보존
+- [ ] A-09 [새 분석] 클릭 → 제출 화면 복귀, **이전 입력 데이터(문서·메신저·깃) 모두 초기화** 확인
+- [ ] A-09a 입력 없는 상태에서 Git·문서·메신저 각각 **"없음"** 표시 확인
 
 ### 시나리오 B — 어뷰징 의심 대응
 - [ ] B-01 EW-01 신호 카드 클릭 → 커밋 해시/작성일/파일 목록 표시
@@ -884,13 +1012,16 @@ def test_isolation_one_module_fails(monkeypatch):          # TC-NFR-3.2-03
 - [ ] C-01 새 GitHub 계정 alias 추가 등장 → 기존 팀원에 N:1 매핑
 - [ ] C-02 매핑 후 막대/산점도에서 단일 인격으로 합산 확인
 
+### 시나리오 D — 실행 파일 아이콘 (NFR-4.1)
+- [ ] D-01 빌드된 `QCE.exe` 파일에 **QCE 전용 아이콘(.ico)**이 적용되어 표시됨
+
 ---
 
 # 부록 B. 미커버 점검 (G8)
 
 아래 FR/NFR 중 `test-cases.md`에 케이스가 **하나도 없으면** G8 위반 → 즉시 추가.
 `FR-1.1 1.2 1.3 / 2.1 2.2 / 3.1 3.2 3.3 / 4.1 4.2 4.2b 4.2c 4.2d 4.3 4.4 / 5.1 5.1a 5.1b 5.1c 5.1d 5.2 5.3 5.4 5.5 5.6 5.7`
-`NFR-1.1 1.2 1.3 / 2.1 2.2 2.3 2.4 / 3.1 3.2`
+`NFR-1.1 1.2 1.3 / 2.1 2.2 2.3 2.4 / 3.1 3.2 / 4.1`
 (본 문서 기준 전 항목 커버됨 — 확장 시 본 목록과 §10 추적표를 동기화한다.)
 
 ---
@@ -902,3 +1033,4 @@ def test_isolation_one_module_fails(monkeypatch):          # TC-NFR-3.2-03
 | v1.0 | 2026-05-29 | 최초 작성. 전 FR/NFR에 대한 실행 가능 케이스, 계약 블록, pytest 스켈레톤, 12개 차트 게이트, 수동 체크리스트, 미커버 점검 포함. RR v1.3 기준(슬랙 제외·3종 차트·FR-4.2d 통일). | QCE 개발팀 |
 | **v1.1** | **2026-05-31** | **RR v1.4·view-design v1.3 동기화: FR-5.4(3-스크린 네비게이션)·FR-5.5(제출 화면)·FR-5.6(로딩 화면)·FR-5.7(결과 화면 계정 병합 재집계) 케이스 신설. FR-5.7은 View(L3) + 재집계 경로(Controller+Model, L2)로 분리. 부록 B 미커버 점검 목록에 5.4~5.7 추가.** | QCE 개발팀 (이대한) |
 | **v1.2** | **2026-05-31** | **구 SRS.md 폐지 반영(A1~A4). (1) **FR-4.2c 이상 신호 예외 처리 섹션 신설**(NormalizedSignalsTracker L1 + AnomalySignalPanel L3, TC-FR-4.2c-01~08). (2) FR-4.2d 헤더 "번호 정합" 노트를 확정 체계(4.2c=예외·4.2d=Z-Score)로 갱신. (3) FR-4.2에 `detect_capping` 케이스(TC-FR-4.2-08·09) 및 계약에 detect_capping/build_signal_details 추가. (4) FR-1.3에 AliasExtractor 케이스(TC-FR-1.3-06~09). (5) FR-4.4에 redistribute/normalize/match_preset 케이스(TC-FR-4.4-10~14). (6) 부록 B 미커버 목록에 4.2c 추가. 상위 문서 RR v1.5·Architecture v1.3로 갱신.** | QCE 개발팀 |
+| **v1.3** | **2026-06-01** | **RR v1.6·test-plan v1.3 사용자 피드백(11대 UI/UX 결함 및 기능 방어 요소) 반영. (1) FR-3.1에 카톡 단독 파이프라인(TC-FR-3.1-06) 및 매핑 식별자 100% 표출(TC-FR-3.1-07) 케이스·pytest 스켈레톤 추가. (2) FR-4.4 UI에 가중치 실시간 연동(TC-FR-4.4-15), 숫자 표시(TC-FR-4.4-16), "작업 종류 별 반영 비율" 헤더(TC-FR-4.4-17), 연동 일관성(TC-FR-4.4-18) 케이스·pytest 추가. (3) FR-5.1 placeholder 문구를 "분석할 데이터가 없습니다."로 변경(TC-FR-5.1-01). (4) FR-5.1a 툴팁에 원시값 구성요소 포함(TC-FR-5.1a-03 개정·TC-FR-5.1a-10 신설). (5) FR-5.4에 [새 분석] 입력 초기화(TC-FR-5.4-07·08)·pytest 추가. (6) FR-5.5에 입력 파일명/저장소명 표시(TC-FR-5.5-06~08), 미입력 시 "없음" 표시(TC-FR-5.5-09)·pytest 추가. (7) FR-5.7에 빈 매핑 OK 차단(TC-FR-5.7-07), Cancel 안전 처리(TC-FR-5.7-08), OK 활성 조건(TC-FR-5.7-09), Cancel 후 재사용(TC-FR-5.7-10)·pytest 추가. (8) 부록 A 수동 체크리스트에 아이콘·가중치 연동·placeholder·파일명 표시·입력 초기화·매핑 방어·카톡 단독 항목 추가, 시나리오 D(아이콘) 신설. (9) 부록 B 미커버 목록에 NFR-4.1 추가. 상위 문서 RR v1.6·test-plan v1.3으로 갱신.** | QCE 개발팀 |

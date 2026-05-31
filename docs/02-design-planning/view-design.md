@@ -3,8 +3,8 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 문서 버전 | v1.4 |
-| 작성일 | 2026-05-29 |
+| 문서 버전 | v1.5 |
+| 작성일 | 2026-06-01 |
 | 준수 표준 | ISO/IEC/IEEE 29148-2018, ISO/IEC/IEEE 42010 (아키텍처 기술) |
 | 상위 문서 | architecture-overview.md v1.3, Requirements Record v1.5, Concept of Operations v1.3, Development Constraints v2.0 |
 | 관련 ADR | ADR-0001(MVC), ADR-0002(PyQt6) |
@@ -329,6 +329,8 @@ class AliasMappingDialog(QDialog):
     def apply_suggested(self, suggested: dict[str, str]) -> None:
         """Controller가 계산한 추천 매핑({raw_id:대표명})으로 드롭다운 미리 선택.
            대표명이 raw_id와 다르고 팀원 목록에 존재할 때만(=명확한 군집) 채운다."""
+    def _validate_selection(self) -> None:
+        """[개선] 사용자가 매핑(병합) 대상을 하나도 선택하지 않은 경우 확인(OK) 버튼을 비활성화한다."""
 ```
 수용기준 대응: 전 소스 식별자 누락 없이 제시, N:1 매핑, 미매핑 활동 규모 병기, 서로 다른 미매핑 식별자 임의 병합 금지(시스템이 자동 merge하지 않음), "Unknown"(FR-1.2)과 미매핑은 별개 처리. **추천 매핑(`apply_suggested`)은 AliasExtractor(model-business-logic-design §2.11)가 만든 결정론적 후보를 *기본 선택*으로만 채우며, 자동 병합이 아니다(조장이 확정).**
 
@@ -361,6 +363,8 @@ class AnalysisPanel(QWidget):
     def set_analyze_enabled(self, enabled: bool) -> None: ...
     def set_weight_warning(self, msg: str | None) -> None:
         """msg=None이면 경고 해제. 형식 '가중치 합계가 1.00이어야 합니다. 현재: X.XX'."""
+    def update_weight_labels(self) -> None:
+        """[개선] 슬라이더 조작 시 비례 연동된 현재 가중치 값을 숫자로 실시간 표기한다."""
 ```
 > **합계 검증의 위치.** 합=1.0 판정 자체는 Model(WeightPresetManager.validate_sum)의 책임이다. AnalysisPanel은 슬라이더 값 변경 시 `weights_changed`를 올리고, Controller가 검증 결과를 `set_analyze_enabled`/`set_weight_warning`으로 되돌려준다. View는 합계 계산 로직을 보유하지 않는다.
 
@@ -383,7 +387,7 @@ class DashboardView(QWidget):
     def render(self, scores: list[dict], missing: set[str]) -> None:
         """세 차트 + 신호 패널 동시 갱신. 각 차트에 동일 scores·missing 전달."""
     def show_placeholder(self) -> None:
-        """세 차트 패널에 '분석을 실행하면 결과가 표시됩니다.' 표시 + 신호 패널 비움."""
+        """세 차트 패널에 '분석할 데이터가 없습니다.' 표시 + 신호 패널 비움."""
 ```
 
 ### 6.7 WarningBanner `warning_banner.py` (~70) — FR-5.3
@@ -420,6 +424,8 @@ class SubmitScreen(QWidget):
         self.analysis_panel = AnalysisPanel()    # 가중치 프리셋·슬라이더 합성(FR-4.4)
     def dropEvent(self, e) -> None:
         """확장자 분기: 문서→documents_dropped(list), .txt→messenger_dropped(str)."""
+    def clear_inputs(self) -> None:
+        """[개선] 이전 사이클에서 적재된 파일명/저장소명 및 UI 텍스트를 초기화(리셋)한다."""
     def loaded_summary(self) -> str: ...         # "N/N 적재" 피드백 (테스트 접근자)
 ```
 수용기준 대응(FR-5.5): 로고·설명 표시, 멀티포맷 드롭존, 적재 개수 피드백, Git 진입점, 가중치 패널, [분석 시작]→로딩 화면 전환. `analyze_clicked`는 AnalysisPanel이 발행한다.
@@ -457,6 +463,8 @@ class ResultScreen(QWidget):
     def populate_merge(self, scores: list[dict]) -> None: ...
     def set_suggested_mapping(self, suggested: dict[str, str]) -> None:
         """AliasExtractor 추천 매핑을 병합 컨트롤에 미리 채움(FR-1.3)."""
+    def reset_mapping_state(self) -> None:
+        """[개선] 병합 취소 시 매핑 컨트롤만 안전하게 닫히고 기존 화면/차트 상태를 유지하도록 복구한다."""
 ```
 > **병합 = 재집계.** 정규화(FR-4.1)는 팀원 집합 전체에 의존하므로, 두 계정을 합치면 모든 팀원의 정규화 점수·순위·평균선·사분면이 바뀐다. 따라서 병합은 시각적 합산이 아니라 **원시 지표 재집계 → 재정규화 → 재렌더**(Model 왕복, 로딩 화면 재진입)를 거친다. 중복 실행 가드(NFR-1.2)·결정론(NFR-1.3)이 재적용된다. View는 `merge_requested`만 올리고 재집계는 Controller·Model의 책임이다(INV-V1).
 
@@ -504,7 +512,7 @@ class BaseChartWidget(QWidget):
     # --- 공개 (추상/공통) ---
     def render(self, scores: list[dict], missing: set[str]) -> None: ...  # 추상
     def show_placeholder(self) -> None:
-        """축 숨기고 중앙에 '분석을 실행하면 결과가 표시됩니다.' 텍스트."""
+        """축 숨기고 중앙에 '분석할 데이터가 없습니다.' 텍스트."""
     def clear(self) -> None: ...
 
     # --- 보호 (애니메이션 골격) ---
@@ -533,7 +541,7 @@ class BarChartWidget(BaseChartWidget):
         """각 막대 높이 = m[K_TOTAL] * progress. progress=1.0에서 최종 높이."""
     def _draw_average_line(self) -> None: ...
     def _build_tooltip(self, m: dict) -> str:
-        """6항목: 팀원명 / Git / 문서 / 메신저 / 종합 / Capping 발동 여부."""
+        """[개선] 6항목: 팀원명 / Git(원시 라인수 포함) / 문서(원시 글자수 포함) / 메신저(원시 발화수 포함) / 종합 / Capping 발동 여부."""
     # --- 테스트 접근자 ---
     @property
     def average_line_y(self) -> float: ...          # test_bar_average_line
@@ -585,8 +593,8 @@ class ScatterChartWidget(BaseChartWidget):
     def _on_pick(self, event) -> None:
         """점 클릭 → member_selected 발행 (애니 중이면 무시, INV-V5)."""
     def _build_tooltip(self, m: dict) -> str:
-        """9항목: 팀원명/Git 정규화/Git 원시/Capping/문서 정규화/문서 원시/
-           메신저 정규화/메신저 원시/종합. 강조 여부는 m[K_ANOMALY]로 판단."""
+        """[개선] 9항목: 팀원명/Git 정규화/Git 원시(추가 라인)/Capping/문서 정규화/문서 원시(글자수)/
+           메신저 정규화/메신저 원시(발화 수)/종합. 강조 여부는 m[K_ANOMALY]로 판단."""
     # --- 테스트 접근자 ---
     @property
     def quadrant_labels(self) -> list[str]: ...              # test_scatter_quadrant_labels (4개)
@@ -734,3 +742,4 @@ GRID_STEP          = 0.2
 | **v1.2** | **2026-05-30** | **§5.3 점수 dict 키를 실제 `MemberScore`(common/dto) 필드명과 일치시킴: `raw_char_count`→`raw_chars`, `raw_msg_count`→`raw_messages`, `anomaly_flags`→`signals`. contract.py 상수값도 동일하게 갱신(상수 식별자 K_RAW_CHAR/K_RAW_MSG/K_ANOMALY는 유지, 값만 변경). 이로써 Controller의 `dataclasses.asdict()` 변환이 키 재매핑 없이 무손실이 된다. View 코드·테스트 fixture는 본 계약표를 단일 출처로 사용. | QCE 개발팀 (이대한) |
 | **v1.3** | **2026-05-31** | **3-스크린 구조(FR-5.4) 및 결과화면 계정 병합(FR-5.7) 반영. (1) §3: MainWindow를 QStackedWidget 셸로 재정의, `panels/submit_screen.py`·`loading_screen.py`·`result_screen.py`·`assets/logo.png` 추가, LOC 표·합계 갱신. (2) §4 합성 트리를 MainWindow→3스크린 구조로 교체. (3) §5.1 입력 드롭 신호 발신을 MainWindow→SubmitScreen으로 이동, `alias_mapping_requested` 제거, `merge_requested`·`new_analysis_requested` 신설. (4) §5.2 화면 전환 슬롯(show_submit/loading/result)·ResultScreen.render/populate_merge 추가. (5) §6.1 MainWindow를 셸+스택으로 개정, §6.3 AliasMappingDialog를 결과화면 병합 컨트롤로 용도 변경(FR-1.3 일원화, 분석-전 모달 폐기), §6.9 SubmitScreen·§6.10 LoadingScreen·§6.11 ResultScreen 신설. (6) §8 상태 전이를 Submit→Loading→Result 3화면 모델로 개정, 병합 시 재집계(Model 왕복) 경유 명시. 가중치 패널은 제출 화면에 배치. 상위 요구사항은 RR v1.4 FR-5.4~5.7 참조. | QCE 개발팀 (이대한) |
 | **v1.4** | **2026-05-31** | **구 SRS.md 폐지 반영 — 이상 신호 카드 UI·신원 매핑 추천 도입. (1) **§6.12 AnomalySignalPanel 신설**(FR-4.2/4.2b/4.2d 신호 카드 + FR-4.2c "정상으로 표시" 버튼, `signal_dismissed` 중계만). (2) §6.6 DashboardView에 `signals_panel`·`signal_dismissed` 통합. (3) §6.11 ResultScreen에 `signal_dismissed` 중계·`set_suggested_mapping` 추가. (4) §6.3 AliasMappingDialog에 `apply_suggested`(AliasExtractor 추천 기본선택, 자동병합 아님) 추가. (5) §5.1에 `signal_dismissed`, §5.2에 `set_suggested_mapping` 행 추가. (6) §5.3 점수 dict 스키마에 `signal_details`·`commit_dates` 키 및 contract 상수 `K_SIGNAL_DETAILS`·`K_COMMIT_DATES` 추가, signals 예시 갱신. (7) §12 RTM에 AnomalySignalPanel 행 추가. Model 측 상세는 model-business-logic-design.md v1.3 §2.10·§2.11, 배선은 controller-design.md 참조. | QCE 개발팀 |
+| v1.5 | 2026-06-01 | 사용자 피드백(UI/UX 개선 및 버그 수정) 반영: (1) §6.3 AliasMappingDialog 미선택 시 OK 버튼 방어 로직 추가. (2) §6.5 AnalysisPanel에 설명 문구('작업 종류 별 반영 비율') 및 실시간 숫자 표기 갱신 메서드 추가. (3) §6.6/§7.1 placeholder 안내 문구를 '분석할 데이터가 없습니다.'로 변경. (4) §6.9 SubmitScreen에 입력 데이터 리셋(clear_inputs) 및 파일명("없음" 포함) 노출 사양 추가. (5) §6.11 ResultScreen에 매핑 취소 UI 증발 방지 메서드(reset_mapping_state) 추가. (6) §7.2/§7.4 차트 툴팁 구성에 원시 데이터(Raw data) 노출 구체화. | QCE 개발팀 |

@@ -3,8 +3,8 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 문서 버전 | v1.1 |
-| 작성일 | 2026-05-31 |
+| 문서 버전 | v1.2 |
+| 작성일 | 2026-06-01 |
 | 상위 문서 | Architecture Overview v1.3, Requirements Record v1.5, Development Constraints v2.0 |
 | 관련 Spec | `backend/specs/01-ooxml-pipeline.md`, `02-git-pipeline.md`, `03-messenger-pipeline.md` |
 | 관련 ADR | ADR-0003 (kiwipiepy > KoNLPy, NLP 엔진 선정) |
@@ -164,12 +164,12 @@ class ParseResult:                      # FR-3.2 — MessengerParser 출력
 
 ## 5. MessengerParser (FR-3.1, FR-3.2)
 
-- **책임:** 카카오톡 `.txt` 내보내기 파일을 발화자·시각·메시지 구조로 정규화한다. 파싱에 실패한 줄은 예외로 중단하지 않고 **건너뛰며 카운트**한다(방어적 파싱).
+- **책임:** 카카오톡 `.txt` 내보내기 파일을 발화자·시각·메시지 구조로 정규화한다. 파싱에 실패한 줄은 예외로 중단하지 않고 **건너뛰며 카운트**한다(방어적 파싱). **또한, 추출된 발화자(식별자)가 매핑 목록에서 누락되지 않도록 100% 보존해야 하며, 카카오톡 파일 단독 분석 시에도 파이프라인이 붕괴하지 않도록 정상적인 결과 반환을 철저히 보장한다.**
 - **시그니처:**
   ```python
   class MessengerParser:                  # FR-3.1, FR-3.2
       def parse(self, path: str) -> ParseResult:
-          """카카오톡 .txt 파싱. 오염 줄 skip + 카운트. 인코딩은 EncodingHandler 경유."""
+          """카카오톡 .txt 파싱. 오염 줄 skip + 카운트. 단독 분석 파이프라인 정상 구동 보장."""
   ```
 - **정규식 정본 (D-1):**
 
@@ -190,7 +190,8 @@ class ParseResult:                      # FR-3.2 — MessengerParser 출력
   3. 반환 형태: `ParseResult(records=[...], skipped_lines=N)`.
 - **예외·방어 처리:**
   - 정상 10 + 오염 3 → records 10, skipped 3. 전체 100줄 오염 → records 0, skipped 100, 예외 없음 (FR-3.2 수용기준).
-  - 어떤 입력에서도 프로세스가 종료되지 않는다.
+  - **식별자 누락 방지:** 정규식에 매칭된 유효 발화 라인의 `author` 데이터는 앞뒤 공백 제거 등 기초 정제만 수행할 뿐 임의로 버리지 않으며, 추출된 모든 발화자가 상위 `AliasMapper`로 100% 안전하게 전달되도록 보장한다.
+  - **단독 분석 보장:** 타 데이터 소스(Git, 문서) 없이 카카오톡 파일만 단독으로 주입되더라도 파서가 `None`이나 크래시를 발생시키지 않고 규격화된 `ParseResult`를 반환하여 프로세스 종료를 막는다.
 - **하위 처리:** records는 `StopwordFilter.count_valid_messages()`로 전달되어 유효 메시지 수로 집계된다(§6). MessengerParser 자체는 불용어 판정을 수행하지 않는다(책임 분리).
 - **추적:** FR-3.1(카카오톡 파싱), FR-3.2(오염 줄 방어적 skip). 제약 C-5. 의존 EncodingHandler(NFR-3.1). Spec `03-messenger-pipeline.md` AC-1~AC-2.
 
@@ -316,3 +317,4 @@ class ParseResult:                      # FR-3.2 — MessengerParser 출력
 | :--- | :--- | :--- | :--- |
 | v1.0 | 2026-05-30 | 최초 작성. 6개 Parsing 컴포넌트(DocumentParser·GitAnalyzer·GitHealthChecker·MessengerParser·StopwordFilter·EncodingHandler) 상세 설계. 설계 결정 6건(D-1~D-6) 확정 기록: 카카오톡 정규식 Spec 정본화, 슬랙 제외(`specs/03` 정리), 정식 경로 `src/models/parsers/` 확정, HWPX Spec 채택, 불용어 규칙 FR-3.3 매핑, 참조 목록 확정. 구현 경로 정합성 격차(OI-P1~P6) 및 파서 레이어 RTM 포함. | QCE 개발팀 (조원희) |
 | **v1.1** | **2026-05-31** | **(1) **D-3 정정**: `src/`가 운영 경로라는 초기 판단은 사실과 반대였음을 확인(외부에서 `qce/`만 import). `src/` 삭제로 운영 경로를 `qce/`로 단일화, §9 전면 갱신(9.1 판정 정정·9.2 매핑을 qce 단일화·9.3 OI-P1~P7 해소). (2) §1.4·§3: `CommitStats.commits_list`(커밋 단위 명세) 추가 및 GitAnalyzer가 작성자별 합계와 함께 커밋 상세를 채우도록 보강 — FR-4.2 커밋별 Capping·FR-4.2b 빈도 신호·타임라인의 근거(이전 휴면 로직 활성화). (3) 상위 문서 참조를 Arch v1.3·RR v1.5로 갱신.** | QCE 개발팀 |
+| v1.2 | 2026-06-01 | 사용자 피드백(버그 개선) 반영: §5 MessengerParser의 책임 및 예외·방어 처리 항목에 (1) 카카오톡 로그 내 발화자(식별자) 매핑 누락 방지 보장 원칙과 (2) 카카오톡 데이터 단독 적재 및 분석 시 파이프라인 붕괴 방지 보장 원칙 추가 명문화. | QCE 개발팀 (조원희) |

@@ -3,8 +3,8 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 문서 버전 | v1.3 |
-| 작성일 | 2026-05-31 |
+| 문서 버전 | v1.4 |
+| 작성일 | 2026-06-01 |
 | 상위 문서 | Architecture Overview v1.3, Requirements Record v1.5, Development Constraints v2.0, Controller Design v1.2 |
 | 관련 ADR | ADR-0004 (JSON 캐시 vs pickle) |
 | 작성 주체 | QCE 개발팀 (김휘중) |
@@ -47,9 +47,9 @@ class MemberScore:                      # FR-4.* 통합 결과
     doc_score: float                    # 0.0~1.0
     msg_score: float                    # 0.0~1.0
     total_score: float                  # 0.0~1.0
-    raw_additions: int
-    raw_chars: int                      # 문서 유효 글자수(원시)
-    raw_messages: int                   # 메신저 유효 발화수(원시)
+    raw_additions: int                  # [개선] UI 툴팁 노출용 Git 원시 데이터
+    raw_chars: int                      # [개선] UI 툴팁 노출용 문서 유효 글자수
+    raw_messages: int                   # [개선] UI 툴팁 노출용 메신저 유효 발화수
     capping_applied: bool
     signals: list[str] = field(default_factory=list)        # 표시 라벨 예: ["CAPPING","EW-02","ZSCORE"]
     signal_details: list[dict] = field(default_factory=list)  # 신호 카드 표시·FR-4.2c 예외용(아래)
@@ -164,16 +164,17 @@ class MemberScore:                      # FR-4.* 통합 결과
       def clamp(value: float) -> float:  """[0.0, 1.0] 제한."""
       def normalize(self, weights: dict[str, float]) -> dict[str, float]:
           """음수 0 처리 후 합 1.0으로 비례 정규화(합 0이면 균등 분배)."""
-      def redistribute(self, changed_key, new_value, current) -> dict[str, float]:
-          """한 축을 new_value로 바꿀 때 나머지 두 축을 기존 비율대로
-             비례 재분배해 합 1.0 유지. 반올림 잔차는 마지막 축이 흡수."""
+      def redistribute(self, changed_key: str, new_value: float, current: dict) -> dict[str, float]:
+        """UI 실시간 연동 지원: 한 축(changed_key)을 new_value로 변경 시,
+           나머지 두 축을 기존 비율대로 비례 재분배해 합 1.0 유지. 
+           반올림 잔차는 마지막 축이 흡수한다."""
   ```
 - **알고리즘:**
   - `validate_sum()`: `abs(w_git + w_doc + w_msg - 1.0) < 0.0001`이면 `True`.
   - `normalize()`: 각 값을 `max(0, v)`로 보정 후 합으로 나눠 비례 축소한다(상한 클램프는 하지 않아 임의 양수 크기 입력도 처리). 합이 0이면 1/3 균등 분배. 소수 4자리 반올림 후 잔차를 마지막 축에 흡수해 합을 정확히 1.0으로 맞춘다.
   - `redistribute()`: 변경 축을 `clamp(new_value)`로 고정하고, 잔여(`1 - fixed`)를 나머지 두 축의 기존 비율대로 배분한다. 나머지 합이 0이면 잔여를 균등 분배. 잔차는 마지막 축이 흡수한다. 모든 연산은 결정론적이다(NFR-1.3).
   - `match_preset()`: PRESETS를 순회하며 ±0.0001 이내로 일치하는 프리셋명을 반환, 없으면 `None`.
-- **UI 연동:** 합 ≠ 1.0일 경우 View의 [분석 시작] 버튼이 비활성화되고, 경고 문구 `"가중치 합계가 1.00이어야 합니다. 현재: X.XX"`가 표시된다 (RR FR-4.4). 슬라이더 step은 0.05 단위. `redistribute`/`normalize`/`match_preset`은 슬라이더 자동 균형·프리셋 표시 등에 활용 가능한 보조 연산이다(RR FR-4.4 보조 수용기준).
+  - UI 연동 (개선사항): View의 AnalysisPanel 슬라이더 값 변경 시 `redistribute`가 즉시 호출되어 나머지 슬라이더 바를 자동으로 비례 연동(갱신)하고, 변경된 수치값을 UI에 텍스트로 실시간 표기한다 (FR-4.4). 합 ≠ 1.0일 경우 [분석 시작] 버튼이 비활성화되고 경고 문구가 표시된다.
 
 ---
 
@@ -409,3 +410,4 @@ msgs: {author: count} ──┤                   │         │
 | v1.1 | 2026-05-30 | (1) FR-4.2d → FR-4.2c 식별자 통일 (architecture-overview.md v1.1 동기화). (2) 참조 데이터 타입(§1.4) 추가. (3) 설계 불변식(§1.3) 추가 — PyQt6 금지, 파서 직접 import 금지, 판정 금지, 결정론 보장. (4) AliasMapper에 Unknown vs 미매핑 용어 구분 명시. (5) CacheManager에 저장 항목 화이트리스트 및 원자적 쓰기 절차 상세 추가. (6) ReportExporter에 경고 문구 형식 사양 추가. (7) 컴포넌트 간 데이터 흐름도(§3) 추가. (8) 아키텍처 RTM(§4) 추가. (9) 각 클래스에 코드 블록 형태의 시그니처 추가. | QCE 개발팀 |
 | **v1.2** | **2026-05-31** | **(1) AliasMapper §2.6에 호출 방식 명시 — 1차 분석=항등 매핑, 병합 재집계=결과 화면 사후 재호출 (FR-1.3 개정, Controller Design v1.1 §4 연동). (2) ContributionAggregator §2.7에 병합 재집계 경로 및 재정규화 필요성 명시 (FR-5.7). (3) ContributionAggregator §2.7에 출력 소비 방식(INV-V1 — asdict 직렬화는 Controller 책임) 명시. (4) 상위 문서 목록에 Controller Design v1.1 추가.** | QCE 개발팀 |
 | **v1.3** | **2026-05-31** | **구 SRS.md 폐지 반영 및 구현분 정합화(A1~A4). (1) §1.4 데이터 타입을 실제 코드 필드명으로 정합화(`raw_chars`·`raw_messages`·`signals`) 및 신규 필드 `signal_details`·`commit_dates`, `CommitStats.commits_list` 추가 + signal_details 원소 구조 명세. (2) §2.3 AnomalySignalDetector에 `detect_capping`·`detect_zscore_detail`·`build_signal_details` 추가, 실현 FR에 FR-4.2·FR-4.2d(Z-Score) 반영. (3) §2.4 WeightPresetManager에 `normalize`·`redistribute`·`match_preset`·`clamp`·`get_preset`·`preset_names` 추가(FR-4.4 보조 연산). (4) **§2.10 NormalizedSignalsTracker 신설(FR-4.2c 예외 처리)** — 번호 체계 4.2c=예외·4.2d=Z-Score (RR v1.5 정합). (5) **§2.11 AliasExtractor 신설(FR-1.3 결정론적 병합 후보 제안)**. (6) §2.6 AliasMapper에 AliasExtractor 후보 제안 연동 명시. (7) §4 RTM에 NormalizedSignalsTracker·AliasExtractor 행 추가. 상세 View 설계는 view-design.md, Controller 배선은 controller-design.md 참조.** | QCE 개발팀 |
+| v1.4 | 2026-06-01 | 사용자 피드백(UI/UX 개선) 반영: (1) §1.4 MemberScore 데이터 클래스에 시각화 툴팁 노출용 원시 데이터 필드(raw_additions, raw_chars, raw_messages) 추가. (2) §2.4 WeightPresetManager에 UI 가중치 실시간 비례 연동 및 텍스트 수치 표기를 지원하기 위한 redistribute 메서드의 UI 연동 책임 명시. | QCE 개발팀 |
