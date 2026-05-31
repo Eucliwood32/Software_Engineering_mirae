@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from qce.controller.analysis_orchestrator import AnalysisOrchestrator
+from qce.controller.Controller import AnalysisOrchestrator
 
 
 @pytest.fixture
@@ -148,13 +148,12 @@ def test_katalk_all_authors_appear_in_scores(orchestrator, qtbot, katalk):
 
 def test_failure_resets_is_analyzing(orchestrator, qtbot, monkeypatch):
     """Worker 내부 예외 발생 시 failed 발행 + is_analyzing 해제 (NFR-1.2 비정상 종료 복원)."""
-    # GitAnalyzer.analyze가 예외를 던지도록 강제
-    import qce.controller.analysis_orchestrator as mod
+    import qce.controller.Controller as mod
 
-    def boom(self, repo_path):
-        raise RuntimeError("forced failure")
+    def boom(self):
+        self.signals.failed.emit("forced failure")
 
-    monkeypatch.setattr(mod.GitAnalyzer, "analyze", boom)
+    monkeypatch.setattr(mod.AnalysisWorker, "run", boom)
 
     config = {"doc_paths": [], "git_path": "x", "msg_path": "",
               "weights": {"git": 0.4, "doc": 0.4, "msg": 0.2}}

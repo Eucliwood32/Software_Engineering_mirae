@@ -5,13 +5,14 @@ from typing import Optional, List, Dict, Any, Tuple
 from PyQt6.QtCore import QObject, pyqtSignal, QRunnable, QThreadPool
 
 try:
-    from .Parsers import DocumentParser, GitAnalyzer, MessengerParser
+    from qce.model.parsing.document_parser import DocumentParser
+    from qce.model.parsing.git_analyzer import GitAnalyzer
+    from qce.model.parsing.messenger_parser import MessengerParser
 except ImportError:
-    # Testing or decoupled
     DocumentParser = GitAnalyzer = MessengerParser = None
 
 try:
-    from .BusinessLogic import (
+    from qce.model.business.BusinessLogic import (
         ContributionAggregator, AliasMapper, CacheManager,
         NormalizedSignalsTracker, AliasExtractor
     )
