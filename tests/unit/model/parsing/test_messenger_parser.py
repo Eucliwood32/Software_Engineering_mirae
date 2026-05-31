@@ -72,3 +72,24 @@ def test_no_exception_on_garbage(katalk):             # TC-FR-3.2-04
     lines = ["@@"] * 50 + [("A", "정상")] * 5
     res = MessengerParser().parse(katalk(lines))
     assert len(res.records) == 5
+
+
+# ── FR-3.1 식별자 누락 방지 ──────────────────────────────────────────────────
+
+def test_all_authors_preserved_in_records(katalk):   # TC-FR-3.1-07
+    """파싱된 모든 발화자가 records에 빠짐없이 포함된다.
+    불용어 메시지만 가진 발화자(Bob)도 records에 남아야 한다 — 식별자 누락 방지."""
+    lines = [("Alice", "안녕"), ("Bob", "ㅇㅇ"), ("Charlie", "네")]
+    res = MessengerParser().parse(katalk(lines))
+    authors = {r.author for r in res.records}
+    assert {"Alice", "Bob", "Charlie"}.issubset(authors)
+
+
+def test_author_not_dropped_on_stopword_only_messages(katalk):  # TC-FR-3.1-07 확장
+    """불용어로만 발화한 팀원 식별자가 records에서 사라지지 않는다.
+    StopwordFilter 이전 단계(MessengerParser)는 author를 절대 버리지 않는다."""
+    stopword_only = [("침묵자", "ㄱ"), ("침묵자", "넵"), ("발화자", "오늘 회의록 정리했습니다")]
+    res = MessengerParser().parse(katalk(stopword_only))
+    authors = {r.author for r in res.records}
+    assert "침묵자" in authors
+    assert "발화자" in authors

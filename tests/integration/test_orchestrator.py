@@ -100,6 +100,52 @@ def test_merge_reaggregation_after_analysis(orchestrator, qtbot, tmp_docx, git_r
     assert orchestrator.is_analyzing is False
 
 
+def test_katalk_standalone_pipeline(orchestrator, qtbot, katalk):
+    """카카오톡만 입력(git·문서 없음)해도 파이프라인이 정상 종료되고
+    분석 결과가 반환된다 (TC-FR-3.1-06, FR-3.1 단독 분석 보장)."""
+    config = {
+        "doc_paths": [],
+        "git_path": "",
+        "msg_path": katalk([("A", "회의 시작"), ("B", "확인"), ("A", "수고")]),
+        "weights": {"git": 0.4, "doc": 0.4, "msg": 0.2},
+    }
+
+    with qtbot.waitSignal(orchestrator.completed, timeout=30000) as blocker:
+        orchestrator.start_analysis(config)
+
+    scores = blocker.args[0]
+    assert scores, "카카오톡 단독 입력에서도 점수 목록이 반환돼야 함"
+    authors = {s.author for s in scores}
+    assert "A" in authors
+    assert "B" in authors
+    assert orchestrator.is_analyzing is False
+
+
+def test_katalk_all_authors_appear_in_scores(orchestrator, qtbot, katalk):
+    """불용어만 발화한 팀원도 msg_data에서 누락되지 않아 scores에 포함된다
+    (TC-FR-3.1-07 오케스트레이터 레벨, FR-3.1 식별자 누락 방지)."""
+    # "ㅇㅇ"은 불용어(_REACTION_RE) → filtered count=0이지만 author는 보존돼야 함
+    config = {
+        "doc_paths": [],
+        "git_path": "",
+        "msg_path": katalk([
+            ("Alice", "오늘 회의록 정리했습니다"),
+            ("Bob", "ㅇㅇ"),
+            ("Charlie", "네"),
+        ]),
+        "weights": {"git": 0.4, "doc": 0.4, "msg": 0.2},
+    }
+
+    with qtbot.waitSignal(orchestrator.completed, timeout=30000) as blocker:
+        orchestrator.start_analysis(config)
+
+    scores = blocker.args[0]
+    authors = {s.author for s in scores}
+    assert "Alice" in authors, "유효 발화자가 scores에 없음"
+    assert "Bob" in authors, "불용어 전용 발화자가 식별자 목록에서 누락됨"
+    assert "Charlie" in authors, "단일 불용어 발화자가 누락됨"
+
+
 def test_failure_resets_is_analyzing(orchestrator, qtbot, monkeypatch):
     """Worker 내부 예외 발생 시 failed 발행 + is_analyzing 해제 (NFR-1.2 비정상 종료 복원)."""
     # GitAnalyzer.analyze가 예외를 던지도록 강제

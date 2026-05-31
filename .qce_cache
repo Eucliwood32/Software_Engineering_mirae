@@ -1,220 +1,42 @@
 {
   "scores": [
     {
-      "author": "20221985@edu.hanbat.ac.kr",
-      "git_score": 0.5075,
-      "doc_score": 0.0,
-      "msg_score": 0.0,
-      "total_score": 0.3383,
-      "raw_additions": 91,
-      "raw_chars": 0,
-      "raw_messages": 0,
-      "capping_applied": false,
-      "signals": [],
-      "signal_details": [],
-      "commit_dates": [
-        "2026-05-28",
-        "2026-05-27",
-        "2026-05-27",
-        "2026-05-27",
-        "2026-05-27",
-        "2026-05-27",
-        "2026-05-26"
-      ]
-    },
-    {
-      "author": "20247142@edu.hanbat.ac.kr",
-      "git_score": 0.9504,
-      "doc_score": 0.0,
-      "msg_score": 0.0,
-      "total_score": 0.6336,
-      "raw_additions": 6019,
-      "raw_chars": 0,
-      "raw_messages": 0,
-      "capping_applied": true,
-      "signals": [
-        "CAPPING"
-      ],
-      "signal_details": [
-        {
-          "type": "CAPPING",
-          "hash": "1f8ab11",
-          "date": "2026-05-30 07:03:51 +0900",
-          "additions": 1926
-        },
-        {
-          "type": "CAPPING",
-          "hash": "64afb23",
-          "date": "2026-05-29 01:08:07 +0900",
-          "additions": 1336
-        }
-      ],
-      "commit_dates": [
-        "2026-05-31",
-        "2026-05-31",
-        "2026-05-31",
-        "2026-05-30",
-        "2026-05-29",
-        "2026-05-29",
-        "2026-05-29",
-        "2026-05-28",
-        "2026-05-28",
-        "2026-05-28",
-        "2026-05-28",
-        "2026-05-28",
-        "2026-05-27",
-        "2026-05-27",
-        "2026-05-27",
-        "2026-05-27",
-        "2026-05-27",
-        "2026-05-27"
-      ]
-    },
-    {
-      "author": "96867796+Eucliwood32@users.noreply.github.com",
-      "git_score": 0.3417,
-      "doc_score": 0.0,
-      "msg_score": 0.0,
-      "total_score": 0.2278,
-      "raw_additions": 20,
-      "raw_chars": 0,
-      "raw_messages": 0,
-      "capping_applied": false,
-      "signals": [],
-      "signal_details": [],
-      "commit_dates": [
-        "2026-05-26",
-        "2026-05-26"
-      ]
-    },
-    {
-      "author": "gnlwnd40@gmail.com",
-      "git_score": 0.8889,
-      "doc_score": 0.0,
-      "msg_score": 0.0,
-      "total_score": 0.5926,
-      "raw_additions": 2750,
-      "raw_chars": 0,
-      "raw_messages": 0,
-      "capping_applied": false,
-      "signals": [],
-      "signal_details": [],
-      "commit_dates": [
-        "2026-05-31",
-        "2026-05-31",
-        "2026-05-31",
-        "2026-05-31",
-        "2026-05-30",
-        "2026-05-30",
-        "2026-05-30",
-        "2026-05-29",
-        "2026-05-28",
-        "2026-05-28",
-        "2026-05-27"
-      ]
-    },
-    {
-      "author": "wonhui32@gmail.com",
-      "git_score": 1.0,
-      "doc_score": 0.0,
-      "msg_score": 0.0,
-      "total_score": 0.6667,
-      "raw_additions": 146523,
-      "raw_chars": 0,
-      "raw_messages": 0,
-      "capping_applied": true,
-      "signals": [
-        "CAPPING"
-      ],
-      "signal_details": [
-        {
-          "type": "CAPPING",
-          "hash": "8c4d8ea",
-          "date": "2026-05-31 15:19:20 +0900",
-          "additions": 1442
-        },
-        {
-          "type": "CAPPING",
-          "hash": "ff6e21f",
-          "date": "2026-05-31 07:03:47 +0900",
-          "additions": 1835
-        },
-        {
-          "type": "CAPPING",
-          "hash": "dbfefdd",
-          "date": "2026-05-29 01:56:31 +0900",
-          "additions": 116839
-        },
-        {
-          "type": "CAPPING",
-          "hash": "4b9b34c",
-          "date": "2026-05-28 02:48:17 +0900",
-          "additions": 22663
-        },
-        {
-          "type": "CAPPING",
-          "hash": "97a5ead",
-          "date": "2026-05-27 19:56:48 +0900",
-          "additions": 1346
-        }
-      ],
-      "commit_dates": [
-        "2026-05-31",
-        "2026-05-31",
-        "2026-05-31",
-        "2026-05-31",
-        "2026-05-30",
-        "2026-05-29",
-        "2026-05-29",
-        "2026-05-29",
-        "2026-05-29",
-        "2026-05-28",
-        "2026-05-28",
-        "2026-05-28",
-        "2026-05-27",
-        "2026-05-27",
-        "2026-05-27",
-        "2026-05-27",
-        "2026-05-27"
-      ]
-    },
-    {
-      "author": "원희",
+      "author": "Alice",
       "git_score": 0.0,
       "doc_score": 0.0,
       "msg_score": 1.0,
-      "total_score": 0.3333,
+      "total_score": 1.0,
       "raw_additions": 0,
       "raw_chars": 0,
-      "raw_messages": 582,
+      "raw_messages": 1,
       "capping_applied": false,
       "signals": [],
       "signal_details": [],
       "commit_dates": []
     },
     {
-      "author": "이대한 컴공",
+      "author": "Bob",
       "git_score": 0.0,
       "doc_score": 0.0,
-      "msg_score": 0.9605,
-      "total_score": 0.3202,
+      "msg_score": 0.0,
+      "total_score": 0.0,
       "raw_additions": 0,
       "raw_chars": 0,
-      "raw_messages": 559,
+      "raw_messages": 0,
       "capping_applied": false,
       "signals": [],
       "signal_details": [],
       "commit_dates": []
     },
     {
-      "author": "휘붕이",
+      "author": "Charlie",
       "git_score": 0.0,
       "doc_score": 0.0,
-      "msg_score": 0.4639,
-      "total_score": 0.1546,
+      "msg_score": 0.0,
+      "total_score": 0.0,
       "raw_additions": 0,
       "raw_chars": 0,
-      "raw_messages": 270,
+      "raw_messages": 0,
       "capping_applied": false,
       "signals": [],
       "signal_details": [],
