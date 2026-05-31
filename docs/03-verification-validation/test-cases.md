@@ -3,9 +3,9 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 문서 버전 | v1.1 |
+| 문서 버전 | v1.2 |
 | 작성일 | 2026-05-31 |
-| 상위 문서 | `test-plan.md` v1.0, Requirements Record v1.3, Architecture Overview v1.0 |
+| 상위 문서 | `test-plan.md` v1.2, Requirements Record v1.5, Architecture Overview v1.3 |
 | 작성 주체 | QCE 개발팀 |
 
 ---
@@ -102,7 +102,20 @@ class AliasMapper:                          # FR-1.3
 | TC-FR-1.3-04 | P1 | L1 | "Unknown"(FR-1.2) + 미매핑 alias 공존 | 둘을 동일 취급하지 않음 | Unknown≠미매핑 |
 | TC-FR-1.3-05 | P1 | L2 | 매핑 UI 노출 식별자 = 전 소스 union | 누락 alias 0개(UI 데이터 계약) | 빠짐없이 제시 |
 
+`AliasExtractor`(결정론적 병합 후보 제안, 자동 병합 아님) 및 다이얼로그 추천 적용:
+
+| TC-ID | P | L | 입력 | 기대 | 근거 |
+| :-- | :- | :- | :-- | :-- | :-- |
+| TC-FR-1.3-06 | P0 | L1 | `normalize_key("DH-Lee")`, `"dh.lee"`, `"daehan.lee@x.com"` | 앞 둘 동일 키 / 셋째 로컬파트 추출 | 정규화 |
+| TC-FR-1.3-07 | P0 | L1 | `suggest_groups(["dh-lee","dh.lee","DH LEE"])` | 한 그룹(한글 우선·길이·사전순 대표) | 군집 제안 |
+| TC-FR-1.3-08 | P1 | L1 | `suggest_groups(["Unknown","alice"])` | Unknown 제외, alice 단독 | 라벨 제외 |
+| TC-FR-1.3-09 | P1 | L3 | `apply_suggested({"dh-lee":"이대한",...})` (멤버에 존재) | 해당 행 드롭다운 미리 선택, 대표명==raw_id 행은 미선택 | 추천 기본값 |
+
 ```python
+def test_suggest_groups_clusters_similar():               # TC-FR-1.3-07
+    groups = AliasExtractor().suggest_groups(["dh-lee","dh.lee","DH LEE"])
+    assert len(groups) == 1
+
 def test_n_to_1_merge():                                  # TC-FR-1.3-01
     raw = {"dh-lee":{"add":10}, "daehan.lee":{"add":5}, "이대한":{"add":3}}
     mapping = {"dh-lee":"이대한","daehan.lee":"이대한","이대한":"이대한"}
@@ -324,18 +337,23 @@ class CappingScaler:                        # FR-4.2
 | TC-FR-4.2-05 | P1 | L1 | `log_scale(0)` | `0.0` (`log1p(0)`) | 로그 |
 | TC-FR-4.2-06 | P0 | L1 | 5000줄 단일 커밋 포함 집계 | 내부 집계 기여분 1000으로 제한 + `capping_applied`/플래그 True | EW-01 |
 | TC-FR-4.2-07 | P0 | L2 | Capping 발생 커밋 존재 | 신호 목록에 작성자·커밋 식별·변경량 포함 | 신호 표시 |
+| TC-FR-4.2-08 | P0 | L1 | `detect_capping(repo)` — 2500줄 커밋 1 + 10줄 커밋 1 | 신호 1건, `{author, hash(7자), date, additions=2500}` | 커밋별 탐지 |
+| TC-FR-4.2-09 | P1 | L1 | `detect_capping` — 1000줄 커밋(경계) | 신호 0건(`>`만) | 경계 |
 
 ## FR-4.2b 비정상 빈도 신호 (EW-02)
 
 ### 계약
 ```python
-class AnomalySignalDetector:                # FR-4.2b, FR-4.2d
+class AnomalySignalDetector:                # FR-4.2, FR-4.2b, FR-4.2d
     def detect_frequency(self, repo: dict[str, CommitStats]) -> list[dict]:
         """작성자 단기 커밋 빈도가 평소 일평균의 3배 초과 구간을 신호로.
-           각 항목: {author, period, period_commits, baseline_avg}.
-           (구현은 일자별 커밋 시계열 필요 → 입력 스키마는 구현에서 확장)"""
+           각 항목: {author, period, period_commits, baseline_avg}. (FR-4.2b)"""
+    def detect_capping(self, repo: dict[str, CommitStats]) -> list[dict]:
+        """단일 커밋 추가>1000인 커밋. 각 항목: {author, hash(7), date, additions}. (FR-4.2)"""
     def detect_zscore(self, scores: list[MemberScore]) -> list[str]:
         """정규화 지표 Z-Score ≤ -1.5 가 2개 이상인 팀원명 리스트. (FR-4.2d)"""
+    def build_signal_details(self, repo, scores) -> dict[str, list[dict]]:
+        """팀원별 구조화 신호 상세(카드·예외용). signal_details 스키마로 통합."""
 ```
 
 | TC-ID | P | L | 입력 | 기대 | 근거 |
@@ -344,9 +362,33 @@ class AnomalySignalDetector:                # FR-4.2b, FR-4.2d
 | TC-FR-4.2b-02 | P0 | L1 | 신호 항목 필드 | author·기간·해당기간 커밋수·평소평균 모두 포함 | 항목 구성 |
 | TC-FR-4.2b-03 | P1 | L1 | 균일 빈도(폭주 없음) | 신호 0건 | 오탐 방지 |
 
+## FR-4.2c 이상 신호 예외 처리 (정상으로 표시)
+
+신호 "정상으로 표시" 예외 상태(`NormalizedSignalsTracker`, L1)와 신호 카드 UI(`AnomalySignalPanel`, L3)를 검증한다. 신호는 점수 비반영(STR-7)이므로 예외 처리는 표시만 바꾸고 `total_score`를 변경하지 않는다.
+
+| TC-ID | P | L | 입력 | 기대 | 근거 |
+| :-- | :- | :- | :-- | :-- | :-- |
+| TC-FR-4.2c-01 | P0 | L1 | `dismiss("A","CAPPING","h1")` 후 `is_dismissed` | True | 예외 등록 |
+| TC-FR-4.2c-02 | P0 | L1 | `filter_details` — CAPPING h1 dismiss, h2 유지 | h2만 남음 | 근거 단위 필터 |
+| TC-FR-4.2c-03 | P0 | L1 | 동일 유형 상세 전부 dismiss 후 `apply` | 해당 `signals` 라벨 제거 | 라벨 동기화 |
+| TC-FR-4.2c-04 | P1 | L1 | 일부만 dismiss 후 `apply` | 라벨 유지(잔여 상세 존재) | 부분 유지 |
+| TC-FR-4.2c-05 | P1 | L1 | `apply` 후 원본 scores | 원본 불변(replace 사본) | 불변성 |
+| TC-FR-4.2c-06 | P0 | L3 | 카드 "정상으로 표시" 클릭 | `signal_dismissed(author,type,ref)` 발행(QSignalSpy) | UI 발행 |
+| TC-FR-4.2c-07 | P1 | L3 | `signal_details` 없는 점수로 render | 카드 0개(빈 상태) | 빈 처리 |
+| TC-FR-4.2c-08 | P1 | L3 | 유형별 상세 3종 render | CAPPING·EW-02·ZSCORE 카드 각 1개 | 유형 분류 |
+
+```python
+def test_apply_drops_label_when_all_details_dismissed():       # TC-FR-4.2c-03
+    s = MemberScore("A",0.5,0.5,0.5,0.5,1,1,1,True,["CAPPING"],
+                    [{"type":"CAPPING","hash":"h1","date":"d","additions":2000}])
+    t = NormalizedSignalsTracker(); t.dismiss("A","CAPPING","h1")
+    out = t.apply([s])
+    assert out[0].signal_details == [] and "CAPPING" not in out[0].signals
+```
+
 ## FR-4.2d Z-Score 하위 이상치 신호
 
-> **번호 주의:** RR 본문 헤더는 `FR-4.2c`이나 RTM/ConOps/architecture는 `FR-4.2d`. 본 문서·코드는 **FR-4.2d**로 통일(test-plan §1.3).
+> **번호 정합(확정):** 최종 체계는 `4.2(Capping)·4.2b(빈도)·4.2c(예외 처리)·4.2d(Z-Score)`이며 SRS 원체계·test-plan §1.3·RR v1.5와 일치한다. (구 RR 본문이 Z-Score를 `4.2c`로 오기했던 것을 v1.5에서 `4.2d`로 정정.)
 
 | TC-ID | P | L | 입력 | 기대 | 근거 |
 | :-- | :- | :- | :-- | :-- | :-- |
@@ -404,6 +446,9 @@ class WeightPresetManager:                   # FR-4.4
                "기획 중심":(0.20,0.60,0.20),
                "균형 설정":(0.40,0.40,0.20)}  # (git,doc,msg)
     def validate_sum(self, w_git, w_doc, w_msg) -> bool:  # 합 1.0 여부
+    def normalize(self, weights) -> dict        # 합 1.0 비례 정규화
+    def redistribute(self, key, new_value, current) -> dict  # 비례 재분배
+    def match_preset(self, w_git, w_doc, w_msg) -> str | None  # 프리셋 역추적
 ```
 
 **로직(L1):**
@@ -415,6 +460,11 @@ class WeightPresetManager:                   # FR-4.4
 | TC-FR-4.4-03 | P0 | L1 | PRESETS["균형 설정"] | `(0.40,0.40,0.20)` | 프리셋 |
 | TC-FR-4.4-04 | P0 | L1 | `validate_sum(0.5,0.5,0.5)` | False (합 1.5) | 합 검증 |
 | TC-FR-4.4-05 | P0 | L1 | `validate_sum(0.4,0.4,0.2)` | True | 합 1.0 |
+| TC-FR-4.4-10 | P0 | L1 | `redistribute("git",0.70,{git:.4,doc:.4,msg:.2})` | git=0.70, doc=0.20, msg=0.10, 합 1.0 | 비례 재분배 |
+| TC-FR-4.4-11 | P1 | L1 | `redistribute("git",1.5,...)` | git 1.0으로 클램프, 합 1.0 | 클램프 |
+| TC-FR-4.4-12 | P1 | L1 | `redistribute` 나머지 합 0 | 잔여 균등 분배 | 0 분모 방어 |
+| TC-FR-4.4-13 | P1 | L1 | `normalize({git:2,doc:1,msg:1})` | git=0.5, 합 1.0 | 정규화 |
+| TC-FR-4.4-14 | P1 | L1 | `match_preset(0.60,0.25,0.15)` / 커스텀값 | "개발 중심" / None | 역추적 |
 
 **UI(L3):**
 
@@ -839,7 +889,7 @@ def test_isolation_one_module_fails(monkeypatch):          # TC-NFR-3.2-03
 # 부록 B. 미커버 점검 (G8)
 
 아래 FR/NFR 중 `test-cases.md`에 케이스가 **하나도 없으면** G8 위반 → 즉시 추가.
-`FR-1.1 1.2 1.3 / 2.1 2.2 / 3.1 3.2 3.3 / 4.1 4.2 4.2b 4.2d 4.3 4.4 / 5.1 5.1a 5.1b 5.1c 5.1d 5.2 5.3 5.4 5.5 5.6 5.7`
+`FR-1.1 1.2 1.3 / 2.1 2.2 / 3.1 3.2 3.3 / 4.1 4.2 4.2b 4.2c 4.2d 4.3 4.4 / 5.1 5.1a 5.1b 5.1c 5.1d 5.2 5.3 5.4 5.5 5.6 5.7`
 `NFR-1.1 1.2 1.3 / 2.1 2.2 2.3 2.4 / 3.1 3.2`
 (본 문서 기준 전 항목 커버됨 — 확장 시 본 목록과 §10 추적표를 동기화한다.)
 
@@ -851,3 +901,4 @@ def test_isolation_one_module_fails(monkeypatch):          # TC-NFR-3.2-03
 | :--- | :--- | :--- | :--- |
 | v1.0 | 2026-05-29 | 최초 작성. 전 FR/NFR에 대한 실행 가능 케이스, 계약 블록, pytest 스켈레톤, 12개 차트 게이트, 수동 체크리스트, 미커버 점검 포함. RR v1.3 기준(슬랙 제외·3종 차트·FR-4.2d 통일). | QCE 개발팀 |
 | **v1.1** | **2026-05-31** | **RR v1.4·view-design v1.3 동기화: FR-5.4(3-스크린 네비게이션)·FR-5.5(제출 화면)·FR-5.6(로딩 화면)·FR-5.7(결과 화면 계정 병합 재집계) 케이스 신설. FR-5.7은 View(L3) + 재집계 경로(Controller+Model, L2)로 분리. 부록 B 미커버 점검 목록에 5.4~5.7 추가.** | QCE 개발팀 (이대한) |
+| **v1.2** | **2026-05-31** | **구 SRS.md 폐지 반영(A1~A4). (1) **FR-4.2c 이상 신호 예외 처리 섹션 신설**(NormalizedSignalsTracker L1 + AnomalySignalPanel L3, TC-FR-4.2c-01~08). (2) FR-4.2d 헤더 "번호 정합" 노트를 확정 체계(4.2c=예외·4.2d=Z-Score)로 갱신. (3) FR-4.2에 `detect_capping` 케이스(TC-FR-4.2-08·09) 및 계약에 detect_capping/build_signal_details 추가. (4) FR-1.3에 AliasExtractor 케이스(TC-FR-1.3-06~09). (5) FR-4.4에 redistribute/normalize/match_preset 케이스(TC-FR-4.4-10~14). (6) 부록 B 미커버 목록에 4.2c 추가. 상위 문서 RR v1.5·Architecture v1.3로 갱신.** | QCE 개발팀 |

@@ -6,7 +6,7 @@
 | 문서 버전 | v1.3 |
 | 작성일 | 2026-05-31 |
 | 준수 표준 | ISO/IEC/IEEE 29148-2018 §9.3 (ConOps) |
-| 관련 문서 | Problem Statement v1.0 (선행), Requirements Record v1.4 (병행), SRS v2.2 (후행) |
+| 관련 문서 | Problem Statement v1.0 (선행), Requirements Record v1.5 (병행, 요구사항 정본) |
 | 작성 주체 | QCE 개발팀 (20222047 조원희 · 20247142 이대한 · 20221985 김휘중) |
 | 검토 주기 | FR/NFR 변경 시 즉시 갱신, 그 외 학기당 1회 |
 
@@ -30,12 +30,11 @@
 
 ### 1.4 참조 문서
 - Problem Statement v1.0
-- Requirements Record v1.3 (`01-requirements/requirements-record.md`)
-- SRS v2.2
+- Requirements Record v1.5 (`01-requirements/00-Requirement-records.md`) — 요구사항 정본
 - `05-decisions/ADR-0001-MVC.md`, `ADR-0002-PyQt6.md`, `ADR-0003-IsolationForest.md`
 
 ### 1.5 용어
-SRS·RR의 용어 정의를 우선 따르며, 본 문서에서 추가로 사용하는 용어는 다음과 같다.
+RR의 용어 정의를 우선 따르며, 본 문서에서 추가로 사용하는 용어는 다음과 같다.
 
 - **운영 세션(Operational Session)**: 조장이 QCE를 실행한 시점부터 종료할 때까지의 단일 사용 단위. NFR-2.3에 따라 세션 종료 시 민감 데이터는 휘발 파기된다. 단, 사용자 설정(가중치 프리셋 등)은 이 정책의 예외다.
 - **평가 사이클(Evaluation Cycle)**: 입력 수집 → 분석 → 리포트 검토(필요 시 결과 화면에서 동일인 계정 병합 → 재집계) → 판단까지의 1회 평가 흐름. 신원 매핑은 분석 후 결과 화면에서 수행한다(FR-1.3/FR-5.7).

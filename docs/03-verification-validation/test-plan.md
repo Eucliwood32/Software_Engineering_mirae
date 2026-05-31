@@ -3,10 +3,10 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 문서 버전 | v1.1 |
+| 문서 버전 | v1.2 |
 | 작성일 | 2026-05-31 |
 | 준수 표준 | ISO/IEC/IEEE 29148-2018, ISO/IEC/IEEE 29119 (테스트 프로세스) |
-| 상위 문서 | Requirements Record v1.3, Architecture Overview v1.0, Development Constraints v2.0, ConOps v1.2 |
+| 상위 문서 | Requirements Record v1.5, Architecture Overview v1.3, Development Constraints v2.0, ConOps v1.3 |
 | 하위 문서 | `test-cases.md` (개별 케이스 정의) |
 | 작성 주체 | QCE 개발팀 |
 | 대상 독자 | **사람 개발자 + 자율 구현 에이전트(AI)** |
@@ -52,7 +52,8 @@ QCE의 모든 기능 요구사항(FR)·비기능 요구사항(NFR)·제약(C)이
 | 차트 종류 | 막대 + 레이더 (2종) | 막대 + 레이더 + 산점도 (3종, FR-5.1a/b/c) | **3종.** 산점도·12개 pytest 케이스 포함 |
 | 불용어 처리 | (명시 없음) | FR-3.3 자동 분류, 사용자 편집 불가 | **자동 StopwordFilter 포함** |
 | 문서 파서 | OoxmlParser | DocumentParser 파사드(.pptx/.docx/.hwpx) | **DocumentParser(.hwpx 포함)** |
-| Z-Score 신호 ID | 없음 | RR 본문은 `FR-4.2c`, RTM·ConOps·arch는 `FR-4.2d` | **`FR-4.2d`로 통일**(RR 본문 헤더는 오타로 간주) |
+| Z-Score 신호 ID | 없음 | RR v1.5에서 본문 헤더 오기(`4.2c`)를 `4.2d`로 정정 | **`FR-4.2d`로 통일**(전 문서 일치) |
+| 신호 예외 처리 ID | 없음 | RR v1.5에서 `FR-4.2c`로 복원(NormalizedSignalsTracker) | **`FR-4.2c`(정상으로 표시).** 확정 체계: 4.2c=예외·4.2d=Z-Score |
 | EW-02 빈도 신호 | 없음 | FR-4.2b | **포함** |
 
 > 위 표 자체가 회귀 방지 체크리스트다. 구현이 슬랙 파싱·2종 차트로 회귀하면 RR v1.3 위반이다.
@@ -512,7 +513,7 @@ WRITE_OK = {"qce/model/business/report_exporter.py",
 | :--- | :--- | :--- |
 | FR-1.1 | unit/model/parsing/test_document_parser.py | L1 |
 | FR-1.2 | unit/model/parsing/test_document_parser.py | L1 |
-| FR-1.3 | unit/model/business/test_alias_mapper.py | L1 |
+| FR-1.3 | unit/model/business/test_alias_mapper.py + test_alias_extractor.py + ui/test_alias_mapping_dialog.py | L1+L3 |
 | FR-2.1 | unit/model/parsing/test_git_analyzer.py | L1 |
 | FR-2.2 | unit/model/parsing/test_git_health_checker.py + ui/test_git_missing_dialog.py | L1+L3 |
 | FR-3.1 | unit/model/parsing/test_messenger_parser.py | L1 |
@@ -521,6 +522,7 @@ WRITE_OK = {"qce/model/business/report_exporter.py",
 | FR-4.1 | unit/model/business/test_normalizer.py | L1 |
 | FR-4.2 | unit/model/business/test_capping_scaler.py | L1 |
 | FR-4.2b | unit/model/business/test_anomaly_signal_detector.py | L1 |
+| FR-4.2c | unit/model/business/test_normalized_signals_tracker.py + ui/test_anomaly_signal_panel.py | L1+L3 |
 | FR-4.2d | unit/model/business/test_anomaly_signal_detector.py + ui/test_scatter_chart.py | L1+L3 |
 | FR-4.3 | unit/model/business/test_weight_rebalancer.py + integration/test_pipeline_missing_source.py | L1+L2 |
 | FR-4.4 | unit/model/business/test_weight_preset_manager.py + ui/test_analysis_panel.py | L1+L3 |
@@ -563,3 +565,4 @@ WRITE_OK = {"qce/model/business/report_exporter.py",
 | :--- | :--- | :--- | :--- |
 | v1.0 | 2026-05-29 | 최초 작성. RR v1.3·architecture v1.0 기준. AI TDD 루프, 정적 게이트(C 제약 코드화), 빌드 DAG, 픽스처 팩토리 계약, 추적 매트릭스 포함. SRS v2.0과의 차이 §1.3에 해소. | QCE 개발팀 |
 | **v1.1** | **2026-05-31** | **RR v1.4·view-design v1.3 동기화: §6 STAGE 7에 SubmitScreen(FR-5.5)·LoadingScreen(FR-5.6)·ResultScreen(FR-5.7)·MainWindow(FR-5.4)·ProgressBar 추가, STAGE 8에 결과 화면 병합 재집계(test_merge_reaggregation)·화면 전환(test_screen_navigation) 통합 테스트 추가. §10 추적 매트릭스에 FR-5.4~5.7 행 추가. FR-5.7 재집계는 Controller+Model 왕복(L2)으로 분류.** | QCE 개발팀 (이대한) |
+| **v1.2** | **2026-05-31** | **구 SRS.md 폐지 반영(A1~A4). §1.3 차이 해소표에 신호 번호 정합 행 갱신: Z-Score=FR-4.2d 통일(구 RR 본문 오기 정정), 신호 예외 처리=FR-4.2c 복원. §10 요구사항→테스트 매핑에 FR-4.2c(test_normalized_signals_tracker.py + ui/test_anomaly_signal_panel.py) 행 추가, FR-1.3에 test_alias_extractor.py·ui/test_alias_mapping_dialog.py 추가. (SRS.md는 보조 문서로 폐지, RR이 단일 정본.)** | QCE 개발팀 |

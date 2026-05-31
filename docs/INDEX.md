@@ -1,17 +1,16 @@
 # QCE 문서 인덱스 (Documentation Index)
 
-본 디렉토리는 QCE(부탁해 꼬마선장) 프로젝트의 연구, 요구사항 명세, 설계, 테스트 및 의사결정 내역을 관리하는 공간입니다. **???** 표준을 기반으로 작성되었습니다.
+본 디렉토리는 QCE(부탁해 꼬마선장) 프로젝트의 연구, 요구사항 명세, 설계, 테스트 및 의사결정 내역을 관리하는 공간입니다. **ISO/IEC/IEEE 29148-2018**(요구공학)·**42010**(아키텍처 기술) 표준을 기반으로 작성되었습니다.
 
 ## 디렉토리 구조 및 내용
 
 ### `00-research-analysis/` (연구 및 분석)
-- `problem-statement.md`: 문제 정의 및 프로젝트 추진 배경
-- `concept-of-operations.md`: 시스템 운용 개념 및 유스케이스 시나리오
+- `00-problem-statement.md`: 문제 정의 및 프로젝트 추진 배경
+- `01-concept-of-operations.md`: 시스템 운용 개념 및 유스케이스 시나리오
 
 ### `01-requirements/` (요구사항 명세)
-- `requirements-record.md`: 기능적 요구사항 (FR) 상세 목록
-- `development-constraints.md`: 비기능적 요구사항 (NFR) 및 제약사항 (C)
-- `requirements-traceability-matrix.md`: **RTM (요구사항 추적 매트릭스)** - 기능 구현 상태 추적
+- `00-Requirement-records.md`: 기능적 요구사항 (FR) 상세 목록 + **RTM (요구사항 추적 매트릭스, §6)** + 변경 이력
+- `01-development-constraints.md`: 비기능적 요구사항 (NFR) 및 제약사항 (C)
 
 ### `02-design-planning/` (설계 및 기획)
 - `architecture-overview.md`: 시스템 아키텍처 및 DFD (데이터 흐름도)
@@ -34,8 +33,7 @@
 - `ADR-template.md`: (신규 의사결정 시 사용할 템플릿)
 
 ### `06-implementation/` (구현 및 배포 가이드)
-- `coding-conventions.md`: 네이밍 규칙, 브랜치 전략, 커밋 메시지 규약
-- `build-and-package.md`: PyInstaller/Nuitka를 활용한 `.exe` / `.app` 빌드 가이드
+- `build-and-package.md`: PyInstaller를 활용한 `.exe` 빌드 가이드
 
 ---
 
@@ -49,4 +47,4 @@
 2. **브랜치 전략:**
    - `main` ← `develop` ← `feature/FR-X-설명` 형태로 PR을 생성합니다.
 3. **요구사항 추적 (RTM):**
-   - 구현이 완료되거나 테스트가 진행 중인 경우, 반드시 `01-requirements/requirements-traceability-matrix.md`의 상태(TODO/WIP/Done)를 갱신합니다.
+   - 요구사항↔구현↔검증 추적은 `01-requirements/00-Requirement-records.md` §6(RTM)과 `03-verification-validation/test-cases.md`에서 관리합니다. 구현/테스트 상태 변경 시 함께 갱신합니다.

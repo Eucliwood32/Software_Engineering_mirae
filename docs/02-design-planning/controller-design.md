@@ -3,9 +3,9 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 문서 버전 | v1.1 |
+| 문서 버전 | v1.2 |
 | 작성일 | 2026-05-31 |
-| 상위 문서 | Architecture Overview v1.2, Requirements Record v1.4, View Design v1.3 |
+| 상위 문서 | Architecture Overview v1.3, Requirements Record v1.5, View Design v1.4 |
 | 관련 모듈 | `AppController`, `AnalysisOrchestrator` |
 | 작성 주체 | QCE 개발팀 (김휘중) |
 
@@ -81,10 +81,21 @@ Controller 레이어는 크게 전역 상태와 라우팅을 담당하는 `AppCo
   
       def on_new_analysis_requested(self) -> None:
           """ResultScreen.new_analysis_requested 수신 → 상태 초기화 → show_submit()"""
+
+      # --- 신규: 신호 예외 처리 (FR-4.2c) ---
+      def on_signal_dismissed(self, author: str, signal_type: str, ref: str) -> None:
+          """ResultScreen.signal_dismissed 수신 → NormalizedSignalsTracker.dismiss()
+             → _render_results()로 재렌더(재집계 없음, 점수 불변, STR-7)."""
+
+      def _render_results(self) -> None:
+          """신호 예외(tracker) 반영 렌더: tracker.apply(_last_scores) → asdict 직렬화
+             → ResultScreen.render → set_suggested_mapping(AliasExtractor 추천)."""
   ```
 
+  > **신호 예외·신원 추천 배선 (c).** Controller는 `NormalizedSignalsTracker`(FR-4.2c)와 `AliasExtractor`(FR-1.3)를 보유하고, 원본 `scores`를 `_last_scores`로 보관한다. (1) 신호 카드 "정상으로 표시"는 `ResultScreen.signal_dismissed(author,type,ref)`로 올라와 `tracker.dismiss()` 후 `_render_results()`로 *재집계 없이* 표시만 갱신한다(점수 불변, STR-7). 새 분석 시 `tracker.clear()`. (2) `_render_results()`는 결과 인물에 `AliasExtractor.suggest_groups`로 병합 후보(대표명≠원본 군집)를 만들어 `ResultScreen.set_suggested_mapping`으로 전달한다(자동 병합 아님, 조장 확정). Model 호출은 Controller가, View엔 dict만 전달 → C-4·INV-V1 준수.
+
 - **신호 connect 대상 (b):**
-  - **추가:** `SubmitScreen.documents_dropped`, `SubmitScreen.git_repo_chosen`, `SubmitScreen.messenger_dropped`, `SubmitScreen.analyze_clicked`(또는 SubmitScreen 중계), `ResultScreen.merge_requested(dict)`, `ResultScreen.new_analysis_requested()`
+  - **추가:** `SubmitScreen.documents_dropped`, `SubmitScreen.git_repo_chosen`, `SubmitScreen.messenger_dropped`, `SubmitScreen.analyze_clicked`(또는 SubmitScreen 중계), `ResultScreen.merge_requested(dict)`, `ResultScreen.new_analysis_requested()`, `ResultScreen.signal_dismissed(str,str,str)` (FR-4.2c)
   - **제거:** `alias_mapping_requested` — 분석-전 매핑 모달 신호 폐기 (FR-1.3 일원화)
   - 입력 드롭 신호 발신 주체: ~~MainWindow~~ → **SubmitScreen**
 
@@ -163,10 +174,11 @@ Controller 레이어는 크게 전역 상태와 라우팅을 담당하는 `AppCo
 | NFR-1.2 (중복 실행 방지) | `is_analyzing` 상태 플래그를 통한 가드(Guard) 처리. 병합 재집계 중 추가 요청도 차단 |
 | NFR-2.4 (캐시 단독 로드) | 기동 시 캐시 존재 시 `show_result()` 즉시 전환 |
 | NFR-3.2 (모듈 격리) | Worker 내에서 개별 파서를 독립적으로 호출하며, 한 파서의 실패가 다른 파서에 영향을 주지 않고 가용 데이터만 `ContributionAggregator`에 주입 |
-| FR-1.3 (신원 매핑, 개정) | 1차 분석은 항등 매핑으로 통과. 병합은 결과 화면 사후 재집계 경로로 처리 |
+| FR-1.3 (신원 매핑, 개정) | 1차 분석은 항등 매핑으로 통과. 병합은 결과 화면 사후 재집계 경로로 처리. 병합 후보는 `AliasExtractor.suggest_groups`로 추천(결정론, 자동병합 아님) → `set_suggested_mapping` |
+| FR-4.2c (신호 예외 처리) | `on_signal_dismissed` → `NormalizedSignalsTracker.dismiss()` → `_render_results()` 재렌더(재집계 없음, 점수 불변). 새 분석 시 `tracker.clear()` |
 | FR-5.4 (3-스크린 전환) | `AppController`가 생명주기별 `show_submit()/show_loading()/show_result()` 호출 |
 | FR-5.7 (결과 화면 계정 병합) | `on_merge_requested` → `start_merge_reaggregation` → 원시 지표 재집계 → 재렌더 |
-| INV-V1 (View 타입 격리) | `on_analysis_completed`에서 `dataclasses.asdict()` 직렬화 후 View에 push |
+| INV-V1 (View 타입 격리) | `on_analysis_completed`/`_render_results`에서 `dataclasses.asdict()` 직렬화 후 View에 push |
 
 ---
 
@@ -209,3 +221,4 @@ ResultScreen.merge_requested(mapping={alias → member})
 | :--- | :--- | :--- | :--- |
 | v1.0 | 2026-05-29 | 최초 작성. `AppController`/`AnalysisOrchestrator` 기본 설계. | QCE 개발팀 |
 | **v1.1** | **2026-05-31** | **(1) 3-스크린 전환 조율 추가 (FR-5.4). (2) 분석-전 매핑 모달 폐기·1차 분석 항등 매핑으로 FR-1.3 개정 반영. (3) 결과 화면 계정 병합 재집계 흐름 신규 §6 추가 (FR-5.7). (4) View 타입 격리(INV-V1) — asdict 직렬화 명시. (5) AnalysisOrchestrator에 원시 지표 보유 책임 추가. (6) AppController 신호 connect 목록 갱신 (merge_requested, new_analysis_requested 추가, alias_mapping_requested 제거). (7) RTM §5 갱신 (FR-5.4, FR-5.7, NFR-2.4, INV-V1, FR-1.3 개정). (8) 상위 문서를 Architecture v1.2·RR v1.4·View Design v1.3로 갱신.** | QCE 개발팀 |
+| **v1.2** | **2026-05-31** | **구 SRS.md 폐지 반영 — 신호 예외 처리·신원 추천 배선 추가. (1) §2.1 인터페이스에 `on_signal_dismissed`·`_render_results` 추가 및 배선 설명(c) — `NormalizedSignalsTracker`(FR-4.2c) 보유, "정상으로 표시"는 재집계 없이 표시만 갱신(점수 불변, STR-7), 새 분석 시 `tracker.clear()`. (2) `_render_results`가 `AliasExtractor.suggest_groups`로 병합 후보를 만들어 `set_suggested_mapping`으로 전달(FR-1.3, 자동병합 아님). (3) 신호 connect 목록에 `ResultScreen.signal_dismissed` 추가. (4) RTM §5에 FR-4.2c 행 추가, FR-1.3 행에 추천 명시. (5) 상위 문서를 Architecture v1.3·RR v1.5·View Design v1.4로 갱신.** | QCE 개발팀 |

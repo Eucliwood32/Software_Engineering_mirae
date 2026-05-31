@@ -5,8 +5,8 @@
 | --- | --- |
 | 문서 버전 | v2.0 |
 | 작성일 | 2026-05-27 |
-| 기준 명세 | SRS v2.0  |
-| 상위 문서 | SRS v2.0 (통합 명세서), Concept of Operations (ConOps) |
+| 기준 명세 | Requirements Record v1.5 |
+| 상위 문서 | Requirements Record v1.5 (요구사항 정본), Concept of Operations (ConOps) |
 | 작성 주체 | QCE 개발팀 (20222047 조원희 · 20247142 이대한 · 20221985 김휘중) |
 
 ---

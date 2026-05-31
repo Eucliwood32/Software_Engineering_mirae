@@ -3,9 +3,9 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 문서 버전 | v1.0 |
-| 작성일 | 2026-05-30 |
-| 상위 문서 | Architecture Overview v1.1, Requirements Record v1.3, Development Constraints v2.0 |
+| 문서 버전 | v1.1 |
+| 작성일 | 2026-05-31 |
+| 상위 문서 | Architecture Overview v1.3, Requirements Record v1.5, Development Constraints v2.0 |
 | 관련 Spec | `backend/specs/01-ooxml-pipeline.md`, `02-git-pipeline.md`, `03-messenger-pipeline.md` |
 | 관련 ADR | ADR-0003 (kiwipiepy > KoNLPy, NLP 엔진 선정) |
 | 작성 주체 | QCE 개발팀 (조원희) |
@@ -45,13 +45,17 @@ Architecture Overview §5.2에서 정의된 레이어 경계 시그니처 위에
 본 레이어는 Architecture Overview §5.1에 정의된 공용 데이터 타입을 사용한다.
 
 ```python
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 @dataclass
 class CommitStats:                      # FR-2.1 — GitAnalyzer 출력 단위
     commits: int
     additions: int
     deletions: int
+    commits_list: list = field(default_factory=list)
+    # commits_list[i] = {"hash","date","additions","deletions"} — 커밋 단위 명세.
+    # 합계(commits/additions/deletions)와 함께 커밋별 내역을 보존하여
+    # FR-4.2(커밋별 Capping)·FR-4.2b(빈도 신호)·타임라인 시각화의 근거가 된다.
 
 @dataclass
 class MessengerRecord:                  # FR-3.1 — 단일 발화 레코드
@@ -125,14 +129,14 @@ class ParseResult:                      # FR-3.2 — MessengerParser 출력
 - **수집 명령:** `git log --numstat --format=%H|%ae|%ai`
   - `%H` 커밋 해시 · `%ae` 작성자 이메일 · `%ai` ISO 8601 타임스탬프.
   - `--numstat`은 커밋별 파일 단위 `추가\t삭제\t경로` 라인을 출력한다.
-  - **정식 경로(`src/`)에는 `--no-merges`가 없어 병합 커밋이 집계에 포함된다.** `qce/`에는 적용되어 있으나 현재 정식 경로와 불일치 상태이다 (OI-P7, 추가 권장).
+  - `--no-merges`로 병합 커밋을 집계에서 제외한다. (구 `src/` 경로는 2026-05-31 삭제되어 운영 경로는 `qce/`로 단일화됨 — §9 참조.)
 - **알고리즘 (스트리밍 라인 파싱):**
   1. `subprocess.run(..., timeout=30, check=True)`로 명령을 실행한다. Windows에서는 콘솔 창 노출을 막기 위해 `CREATE_NO_WINDOW` 플래그를 적용하고, `stdin`은 `DEVNULL`로 차단한다.
   2. stdout을 줄 단위로 순회하며 상태 기계로 파싱한다.
      - **헤더 라인** (`해시|이메일|타임스탬프`, `|` 분할 시 3필드): 현재 작성자(`current_email`)를 갱신하고 해당 작성자의 커밋 수를 +1 한다.
-     - **numstat 라인** (선두가 숫자): 탭 분할하여 추가/삭제를 정수 파싱한다. 바이너리 파일의 `-` 표기는 `0`으로 환산한다. 현재 작성자의 누계(그리고 커밋별 내역)에 가산한다.
-  3. 반환 형태: `{"author@email.com": CommitStats(commits, additions, deletions)}`.
-- **이상 신호용 확장 (정식 경로):** AnomalySignalDetector(FR-4.2b 빈도 신호)가 **커밋별 일자·변경량 시계열**을 필요로 하므로, 정식 경로 구현은 작성자별 집계에 더해 **커밋 상세 리스트**(`{hash, date, additions, deletions}`)를 함께 반환하는 확장 구조를 채택한다. 집계 합계는 상세 리스트로부터 결정론적으로 재현된다. (§9 인터페이스 정합 참조)
+     - **numstat 라인** (선두가 숫자): 탭 분할하여 추가/삭제를 정수 파싱한다. 바이너리 파일의 `-` 표기는 `0`으로 환산한다. 현재 작성자의 누계와 **현재 커밋 레코드(`commits_list`의 마지막 항목)** 양쪽에 가산한다.
+  3. 반환 형태: `{"author@email.com": CommitStats(commits, additions, deletions, commits_list)}`.
+- **이상 신호용 커밋 상세 (구현됨):** AnomalySignalDetector(FR-4.2 커밋별 Capping·FR-4.2b 빈도 신호)와 타임라인 시각화가 **커밋별 일자·변경량 시계열**을 필요로 하므로, `analyze()`는 작성자별 합계에 더해 **커밋 상세 리스트** `commits_list = [{hash, date, additions, deletions}, ...]`를 함께 채운다. 헤더 라인에서 새 커밋 레코드를 push하고 후속 numstat 라인이 그 레코드에 누적된다. 집계 합계는 상세 리스트로부터 결정론적으로 재현된다. (이전 버전은 합계만 채워 FR-4.2/4.2b 로직이 휴면 상태였으며, 본 보강으로 활성화됨.)
 - **예외·방어 처리:**
   - `CalledProcessError`(비-저장소 경로 등), `FileNotFoundError`(`git` 미설치), `TimeoutExpired`(30초 초과), `OSError`는 모두 흡수하여 **빈 dict(`{}`)를 반환**한다 (FR-2.1 "잘못된 경로 → 빈 결과, 예외 없음").
   - 타임아웃 30초는 10,000커밋 저장소를 30초 이내 수집해야 한다는 성능 수용기준(FR-2.1 AC-3)과 정렬된다.
@@ -264,41 +268,29 @@ class ParseResult:                      # FR-3.2 — MessengerParser 출력
 
 > **본 절은 코드 경로 결정(D-3)에 종속되며, §2~7의 설계 본문(아키텍처 §5.2 계약)과 독립적이다.** 정식 경로 판단이 번복되어도 §2~7은 유효하다.
 
-### 9.1 정식 경로 판정
-파서 레이어는 동일 역할의 구현이 **두 경로에 중복 존재**한다. 두 디렉터리 모두 단일 커밋(`dbfefdd`, "Add TDD scaffold")에 함께 등장하므로 커밋 순서로는 구분되지 않으나, 작업 트리 파일 생성 시각(mtime)이 결정적이다.
+### 9.1 정식 경로 판정 [D-3 정정 — 2026-05-31]
+> **정정 요지.** 초기 D-3은 mtime 선행을 근거로 `src/`를 운영 경로로 판단했으나, 이는 사실과 반대였다. `main.py`·`view_demo.py`·`QCE.spec`(`collect_all('qce')`)·전체 테스트가 **모두 `qce.*`만 import**하며, `src/`를 import하는 코드는 `src/` 내부 4개 파일뿐(외부 참조 0건)이었다. 즉 `src/`는 실행·빌드·테스트 어디에도 연결되지 않은 **고아 코드**였다. 이에 따라 **`src/` 디렉터리를 2026-05-31 삭제**하고 운영 경로를 **`qce/`로 단일화**하였다(앱·빌드·테스트 무영향 확인). pyrightconfig.json의 extraPaths에서도 `src` 제거.
 
-| 경로 | 생성 시각(mtime) | 성격 |
+| 경로 | 상태 | 성격 |
 | :--- | :--- | :--- |
-| `src/models/parsers/` | 2026-05-28 17:57–18:19 (**선행**) | **정식(운영) 경로** — `main.py → worker_thread.py` 실행 경로 |
-| `qce/model/parsing/` | 2026-05-29 01:23–01:42 | 테스트 경로 — `tests/unit/model/parsing/` pytest 대상 |
+| `qce/model/parsing/` | **유일 운영 경로** | `main.py` 실행·`QCE.spec` 번들·`tests/unit/model/parsing/` pytest 대상 |
+| ~~`src/models/parsers/`~~ | **삭제됨(2026-05-31)** | 초기 함수형 프로토타입(고아 코드) |
 
-D-3에 따라 **`src/models/parsers/`를 정식 경로**로 확정한다(선 생성 + 실제 앱 실행 경로).
+### 9.2 컴포넌트 ↔ 파일 매핑 (운영 경로 `qce/model/parsing/`)
 
-### 9.2 컴포넌트 ↔ 파일 매핑
+| 설계 컴포넌트 | 운영 파일 (`qce/model/parsing/`) |
+| :--- | :--- |
+| DocumentParser | `document_parser.py` (클래스, .docx/.pptx/.hwpx) |
+| GitAnalyzer | `git_analyzer.py` (클래스, commits_list 보강 §3) |
+| GitHealthChecker | `git_health_checker.py` (클래스) |
+| MessengerParser | `messenger_parser.py` (클래스) |
+| StopwordFilter | `stopword_filter.py` (클래스) |
+| EncodingHandler | `encoding_handler.py` (클래스) |
 
-| 설계 컴포넌트 | 정식 경로 (`src/models/parsers/`) | 테스트 경로 (`qce/model/parsing/`) |
-| :--- | :--- | :--- |
-| DocumentParser | `ooxml_parser.py` (함수 `parse_ooxml_file`) | `document_parser.py` (클래스) |
-| GitAnalyzer | `git_parser.py` (함수 `parse_git_log`) | `git_analyzer.py` (클래스) |
-| GitHealthChecker | *(미존재)* | `git_health_checker.py` (클래스) |
-| MessengerParser | `messenger_parser.py` (함수 `parse_messenger_file`) | `messenger_parser.py` (클래스) |
-| StopwordFilter | *(미존재)* | `stopword_filter.py` (클래스) |
-| EncodingHandler | *(messenger_parser.py에 인라인)* | `encoding_handler.py` (클래스) |
+### 9.3 정합성 격차 (Open Issues) — **해소됨**
+초기 OI-P1~P7은 `src/`(함수형 프로토타입)와 `qce/`(클래스형, 아키텍처 §5.2) 사이의 구조적 격차였다. `src/` 삭제(§9.1)로 운영 경로가 `qce/` 단일 구조(클래스형·타입드 데이터클래스·6 컴포넌트 분리·`--no-merges`·`EncodingHandler` 독립)로 수렴하여 **OI-P1~P7이 모두 해소**되었다. 단위 테스트(`tests/unit/model/parsing/`)는 처음부터 `qce/`를 검증해 왔으므로 운영 경로와 테스트 경로가 일치한다.
 
-### 9.3 정합성 격차 (Open Issues)
-정식 경로(`src/`)와 아키텍처 §5.2/테스트 경로(`qce/`) 사이의 구조적 격차를 기록한다. 헌법 규칙 1(Spec/아키텍처 우선)에 따라, 최종적으로 **아키텍처 §5.2의 6-컴포넌트 클래스 구조로 수렴**시키는 것이 정합 방향이다.
-
-| ID | 격차 | 정식 경로 현황 | 수렴 방향 |
-| :--- | :--- | :--- | :--- |
-| OI-P1 | 함수형 vs 클래스형 | `src/`는 모듈 수준 함수(`parse_*`) | 아키텍처 §5.2 클래스 인터페이스로 래핑 |
-| OI-P2 | 반환 타입 | `src/`는 plain dict 반환 | `CommitStats`/`ParseResult`/`MessengerRecord` 데이터클래스(§1.4)로 정렬 |
-| OI-P3 | 컴포넌트 누락 | `src/`에 `GitHealthChecker`·`StopwordFilter` 부재 | `qce/` 구현을 정식 경로로 이관 |
-| OI-P4 | EncodingHandler 분리 | `src/`는 인코딩 처리를 messenger 파서에 인라인(UTF-8/CP949 2단 루프, charset-normalizer 사전판정 없음) | 독립 `EncodingHandler`로 추출(NFR-3.1) |
-| OI-P5 | 카카오톡 정규식 불일치 | `src/`·Spec = `작성자 : 메시지`(정본, D-1) / `qce/`는 `[작성자] [오전·오후 H:MM]` 브래킷 포맷 사용 | `qce/`를 D-1 정본 포맷으로 정정 |
-| OI-P6 | 손상 docx/pptx 반환값 | `src/`는 손상 시 `{"Unknown": 0}` 반환 / 아키텍처는 빈 dict(`{}`) | FR-1.1 "skip" 의미와 일치하도록 `{}`로 통일 검토 |
-| OI-P7 | `--no-merges` 플래그 | `src/git_parser.py`에는 없음 / `qce/git_analyzer.py`에만 존재 | 병합 커밋 중복 집계 방지를 위해 `src/`에도 추가 권장 (FR-2.1 정확도 영향) |
-
-> **테스트 커버리지 주의.** 현재 pytest 단위 테스트(`tests/unit/model/parsing/`)는 **테스트 경로(`qce/`)를 대상**으로 한다. 정식 경로를 `src/`로 확정(D-3)함에 따라, 위 OI 수렴 작업 시 테스트의 import 대상도 함께 이관되어야 한다. 그 전까지 운영 경로(`src/`)는 단위 테스트로 직접 검증되지 않는 상태임에 유의한다.
+> **카카오톡 정규식(구 OI-P5) 주의.** D-1 정본은 `작성자 : 메시지` 포맷이다. 현재 `qce/`의 카톡 파서가 사용하는 포맷이 D-1과 일치하는지는 별도 점검 대상으로 남는다(본 정합화 범위 밖, 코드 레벨 확인 권장).
 
 ---
 
@@ -323,3 +315,4 @@ D-3에 따라 **`src/models/parsers/`를 정식 경로**로 확정한다(선 생
 | 버전 | 일자 | 변경 | 작성자 |
 | :--- | :--- | :--- | :--- |
 | v1.0 | 2026-05-30 | 최초 작성. 6개 Parsing 컴포넌트(DocumentParser·GitAnalyzer·GitHealthChecker·MessengerParser·StopwordFilter·EncodingHandler) 상세 설계. 설계 결정 6건(D-1~D-6) 확정 기록: 카카오톡 정규식 Spec 정본화, 슬랙 제외(`specs/03` 정리), 정식 경로 `src/models/parsers/` 확정, HWPX Spec 채택, 불용어 규칙 FR-3.3 매핑, 참조 목록 확정. 구현 경로 정합성 격차(OI-P1~P6) 및 파서 레이어 RTM 포함. | QCE 개발팀 (조원희) |
+| **v1.1** | **2026-05-31** | **(1) **D-3 정정**: `src/`가 운영 경로라는 초기 판단은 사실과 반대였음을 확인(외부에서 `qce/`만 import). `src/` 삭제로 운영 경로를 `qce/`로 단일화, §9 전면 갱신(9.1 판정 정정·9.2 매핑을 qce 단일화·9.3 OI-P1~P7 해소). (2) §1.4·§3: `CommitStats.commits_list`(커밋 단위 명세) 추가 및 GitAnalyzer가 작성자별 합계와 함께 커밋 상세를 채우도록 보강 — FR-4.2 커밋별 Capping·FR-4.2b 빈도 신호·타임라인의 근거(이전 휴면 로직 활성화). (3) 상위 문서 참조를 Arch v1.3·RR v1.5로 갱신.** | QCE 개발팀 |

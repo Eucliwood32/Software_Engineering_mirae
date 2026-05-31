@@ -3,9 +3,9 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 문서 버전 | v1.2 |
+| 문서 버전 | v1.3 |
 | 작성일 | 2026-05-31 |
-| 상위 문서 | Architecture Overview v1.2, Requirements Record v1.4, Development Constraints v2.0, Controller Design v1.1 |
+| 상위 문서 | Architecture Overview v1.3, Requirements Record v1.5, Development Constraints v2.0, Controller Design v1.2 |
 | 관련 ADR | ADR-0004 (JSON 캐시 vs pickle) |
 | 작성 주체 | QCE 개발팀 (김휘중) |
 
@@ -36,6 +36,9 @@ class CommitStats:                      # FR-2.1
     commits: int
     additions: int
     deletions: int
+    commits_list: list = field(default_factory=list)
+    # commits_list[i] = {"hash", "date", "additions", "deletions"} — 커밋 단위 명세.
+    # FR-4.2(커밋별 Capping)·FR-4.2b(빈도 신호)·타임라인 시각화의 근거 데이터.
 
 @dataclass
 class MemberScore:                      # FR-4.* 통합 결과
@@ -45,11 +48,22 @@ class MemberScore:                      # FR-4.* 통합 결과
     msg_score: float                    # 0.0~1.0
     total_score: float                  # 0.0~1.0
     raw_additions: int
-    raw_char_count: int
-    raw_msg_count: int
+    raw_chars: int                      # 문서 유효 글자수(원시)
+    raw_messages: int                   # 메신저 유효 발화수(원시)
     capping_applied: bool
-    anomaly_flags: list[str] = field(default_factory=list)  # 예: ["EW-02", "ZSCORE"]
+    signals: list[str] = field(default_factory=list)        # 표시 라벨 예: ["CAPPING","EW-02","ZSCORE"]
+    signal_details: list[dict] = field(default_factory=list)  # 신호 카드 표시·FR-4.2c 예외용(아래)
+    commit_dates: list[str] = field(default_factory=list)     # 커밋 일자(YYYY-MM-DD) 목록
 ```
+
+> **`signal_details` 원소 구조 (FR-4.2/4.2b/4.2d 카드 표시·FR-4.2c 예외 처리용):**
+> - CAPPING: `{"type":"CAPPING","hash","date","additions"}`
+> - EW-02: `{"type":"EW-02","date","period_commits","baseline_avg"}`
+> - ZSCORE: `{"type":"ZSCORE","metrics":[...]}`
+>
+> `signals`(문자열 라벨)와 병행 유지하여 하위호환을 보장한다. 두 필드 모두 종합 점수에
+> 반영되지 않는 *표시 전용* 데이터다(STR-7). View는 `dataclasses.asdict()`로 직렬화된
+> 점수 dict의 `signal_details`만 소비한다(INV-V1).
 
 ---
 
@@ -94,7 +108,7 @@ class MemberScore:                      # FR-4.* 통합 결과
 
 ---
 
-### 2.3 AnomalySignalDetector (FR-4.2b, FR-4.2c)
+### 2.3 AnomalySignalDetector (FR-4.2, FR-4.2b, FR-4.2c, FR-4.2d)
 
 - **책임:** 통계적·규칙적 이상 징후를 식별하여 조장에게 표시하기 위한 신호를 생성한다. **최종 평가 점수에는 자동 반영되지 않으며** (ConOps P5 판정 금지 원칙, STR-7), 조장의 의사결정을 돕는 보조 지표로만 사용된다. 신호는 혐의 제기가 아니라 **검증 권유**이다 (ConOps §7.2).
 - **시그니처:**
@@ -103,13 +117,24 @@ class MemberScore:                      # FR-4.* 통합 결과
       def detect_frequency(self, repo: dict[str, CommitStats]) -> list[dict]:
           """작성자 단기 커밋 빈도가 평소 일평균의 3배 초과 구간을 신호로.
              반환: [{author, period, period_commits, baseline_avg}, ...]"""
+      def detect_capping(self, repo: dict[str, CommitStats]) -> list[dict]:
+          """단일 커밋 추가 라인 > 1000인 커밋을 신호로(해시 7자 축약).
+             반환: [{author, hash, date, additions}, ...]"""
       def detect_zscore(self, scores: list[MemberScore]) -> list[str]:
           """정규화 지표 Z-Score ≤ -1.5가 2개 이상인 팀원명 리스트."""
+      def detect_zscore_detail(self, scores: list[MemberScore]) -> list[dict]:
+          """detect_zscore 상세판. 반환: [{author, metrics:[하위 지표명...]}, ...]"""
+      def build_signal_details(
+          self, repo: dict[str, CommitStats] | None, scores: list[MemberScore]
+      ) -> dict[str, list[dict]]:
+          """팀원별 구조화 신호 상세 묶음 {author: [detail, ...]} (카드 표시용)."""
   ```
 - **알고리즘:**
-  - `detect_frequency()` (EW-02): 작성자별 일자별 커밋 시계열을 구성하여, 특정 일자의 커밋 수가 해당 작성자의 일평균 커밋 수의 3배를 초과하는 구간을 식별한다. 각 신호 항목은 `author`, `period`, `period_commits`, `baseline_avg`를 포함한다.
-  - `detect_zscore()` (FR-4.2c): 정규화된 지표(Git, 문서, 메신저)에 대해 팀원별 Z-Score를 산출하고, Z-Score가 -1.5 이하인 항목이 2개 이상 존재하는 팀원의 이름을 리스트로 반환한다. 신호 대상 팀원은 산점도(FR-5.1c)에서 붉은색 + ⚠ 오버레이로 강조 표시된다.
-- **격리 원칙:** 이 클래스의 출력은 `MemberScore.anomaly_flags`에 기록되지만, `total_score` 계산 경로에는 투입되지 않는다.
+  - `detect_frequency()` (EW-02, FR-4.2b): 작성자별 일자별 커밋 시계열을 구성하여, 특정 일자의 커밋 수가 해당 작성자의 일평균 커밋 수의 3배를 초과하는 구간을 식별한다. 각 신호 항목은 `author`, `period`, `period_commits`, `baseline_avg`를 포함한다.
+  - `detect_capping()` (FR-4.2): `CommitStats.commits_list`를 순회하여 단일 커밋 추가 라인이 1,000을 초과하는 커밋을 신호 항목(작성자·커밋 해시 7자·작성일·변경 라인 수)으로 반환한다. (`commits_list`가 비어 있으면 빈 목록 — GitAnalyzer가 커밋 명세를 채워야 동작하며, `model-parser-design.md` 참조.)
+  - `detect_zscore()` / `detect_zscore_detail()` (FR-4.2d): 정규화된 지표(Git, 문서, 메신저)에 대해 팀원별 Z-Score를 산출하고, Z-Score가 -1.5 이하인 항목이 2개 이상 존재하는 팀원을 식별한다. `detect_zscore`는 이름 리스트를, `detect_zscore_detail`은 해당 팀원의 하위 지표명(`metrics`)을 함께 반환한다. 신호 대상 팀원은 산점도(FR-5.1c)에서 붉은색 + ⚠ 오버레이로 강조 표시된다.
+  - `build_signal_details()`: 위 탐지 결과를 `MemberScore.signal_details` 스키마(§1.4)로 통합하여 팀원별로 묶는다. CAPPING·EW-02·ZSCORE 세 유형을 단일 구조로 합치며, 신호 카드 패널(`AnomalySignalPanel`, view-design)과 예외 처리(`NormalizedSignalsTracker`, §2.10)의 입력이 된다.
+- **격리 원칙:** 이 클래스의 출력은 `MemberScore.signals`/`signal_details`에 기록되지만, `total_score` 계산 경로에는 투입되지 않는다.
 
 ---
 
@@ -130,9 +155,25 @@ class MemberScore:                      # FR-4.* 통합 결과
       PRESETS: dict[str, tuple[float, float, float]]
       def validate_sum(self, w_git: float, w_doc: float, w_msg: float) -> bool:
           """합 1.0 여부 검증. 부동소수점 오차 ±0.0001 허용."""
+      def preset_names(self) -> list[str]: ...
+      def get_preset(self, name: str) -> dict[str, float]:
+          """프리셋명 → {"git","doc","msg"}."""
+      def match_preset(self, w_git, w_doc, w_msg) -> str | None:
+          """현재 가중치와 일치하는 프리셋명 역추적(없으면 None=사용자 조정)."""
+      @staticmethod
+      def clamp(value: float) -> float:  """[0.0, 1.0] 제한."""
+      def normalize(self, weights: dict[str, float]) -> dict[str, float]:
+          """음수 0 처리 후 합 1.0으로 비례 정규화(합 0이면 균등 분배)."""
+      def redistribute(self, changed_key, new_value, current) -> dict[str, float]:
+          """한 축을 new_value로 바꿀 때 나머지 두 축을 기존 비율대로
+             비례 재분배해 합 1.0 유지. 반올림 잔차는 마지막 축이 흡수."""
   ```
-- **알고리즘:** `abs(w_git + w_doc + w_msg - 1.0) < 0.0001`이면 `True`, 아니면 `False`.
-- **UI 연동:** 합 ≠ 1.0일 경우 View의 [분석 시작] 버튼이 비활성화되고, 경고 문구 `"가중치 합계가 1.00이어야 합니다. 현재: X.XX"`가 표시된다 (RR FR-4.4). 슬라이더 step은 0.05 단위.
+- **알고리즘:**
+  - `validate_sum()`: `abs(w_git + w_doc + w_msg - 1.0) < 0.0001`이면 `True`.
+  - `normalize()`: 각 값을 `max(0, v)`로 보정 후 합으로 나눠 비례 축소한다(상한 클램프는 하지 않아 임의 양수 크기 입력도 처리). 합이 0이면 1/3 균등 분배. 소수 4자리 반올림 후 잔차를 마지막 축에 흡수해 합을 정확히 1.0으로 맞춘다.
+  - `redistribute()`: 변경 축을 `clamp(new_value)`로 고정하고, 잔여(`1 - fixed`)를 나머지 두 축의 기존 비율대로 배분한다. 나머지 합이 0이면 잔여를 균등 분배. 잔차는 마지막 축이 흡수한다. 모든 연산은 결정론적이다(NFR-1.3).
+  - `match_preset()`: PRESETS를 순회하며 ±0.0001 이내로 일치하는 프리셋명을 반환, 없으면 `None`.
+- **UI 연동:** 합 ≠ 1.0일 경우 View의 [분석 시작] 버튼이 비활성화되고, 경고 문구 `"가중치 합계가 1.00이어야 합니다. 현재: X.XX"`가 표시된다 (RR FR-4.4). 슬라이더 step은 0.05 단위. `redistribute`/`normalize`/`match_preset`은 슬라이더 자동 균형·프리셋 표시 등에 활용 가능한 보조 연산이다(RR FR-4.4 보조 수용기준).
 
 ---
 
@@ -181,6 +222,7 @@ class MemberScore:                      # FR-4.* 통합 결과
 - **용어 구분 (RR §1.4):**
   - **Unknown 작성자:** OOXML 메타데이터 자체가 비어 있는 문서의 작성자 분류 (FR-1.2). 단일 정의된 분류이다.
   - **미매핑 식별자:** 입력 소스에서 발견되었으나 조장이 어느 팀원에도 연결하지 않은 식별자. Unknown과 미매핑은 별개로 처리된다.
+- **후보 제안 연동:** 병합 매핑의 *초기 추천값*은 `AliasExtractor`(§2.11)가 결정론적으로 제안하며, `AliasMapper`는 조장이 확정한 매핑만 합산한다(제안 ≠ 자동 병합).
 
 ---
 
@@ -265,6 +307,55 @@ class MemberScore:                      # FR-4.* 통합 결과
 
 ---
 
+### 2.10 NormalizedSignalsTracker (FR-4.2c)
+
+- **책임:** 조장이 신호 카드에서 "정상으로 표시"한 이상 신호를 *세션 내 예외 상태*로 기억하고, 재렌더 시 해당 신호를 화면 표시에서 제외한다. 신호는 애초에 점수에 반영되지 않으므로(STR-7) 본 트래커는 **표시 전용 상태만** 다루며 종합 점수를 재산출하지 않는다. 영속화하지 않는다(세션 한정, OI-1, NFR-2.3 휘발 정책 부합).
+- **시그니처:**
+  ```python
+  class NormalizedSignalsTracker:
+      def dismiss(self, author: str, signal_type: str, ref: str = "") -> None: ...
+      def restore(self, author: str, signal_type: str, ref: str = "") -> None: ...
+      def is_dismissed(self, author: str, signal_type: str, ref: str = "") -> bool: ...
+      def clear(self) -> None: """전체 예외 초기화(새 분석 시)."""
+      @staticmethod
+      def ref_of(detail: dict) -> str: """CAPPING=hash, EW-02=date, ZSCORE=""."""
+      def filter_details(self, author: str, details: list[dict]) -> list[dict]: ...
+      def apply(self, scores: list[MemberScore]) -> list[MemberScore]:
+          """예외 반영한 새 MemberScore 목록 반환(원본 불변)."""
+  ```
+- **알고리즘:**
+  - 예외는 `(author, signal_type, ref)` 3-튜플 집합으로 보관한다. `ref`는 신호 유형별 식별자(CAPPING=커밋 해시, EW-02=일자, ZSCORE=빈 문자열)다. 따라서 한 작성자의 동일 유형 신호가 여럿이어도 *근거 단위*로 개별 정상 처리된다(RR FR-4.2c).
+  - `apply()`: 각 `MemberScore`의 `signal_details`에서 예외 항목을 제거하고, 그 결과 *해당 유형의 상세가 모두 사라진 경우에만* `signals` 라벨에서 그 유형을 제거한다. CAPPING/EW-02/ZSCORE 외의 라벨(예: EW-01)은 보존한다. 원본은 변경하지 않고 `dataclasses.replace`로 사본을 만든다.
+- **Controller 연동(C-4):** View(`AnomalySignalPanel`)의 `signal_dismissed(author, type, ref)` Signal → `AppController`가 `dismiss()` 호출 후 `apply()` 결과로 결과 화면을 재렌더한다. 재집계(파서·집계 재실행)는 없다. 상세는 `controller-design.md` 참조.
+
+---
+
+### 2.11 AliasExtractor (FR-1.3)
+
+- **책임:** `AliasMapper`(주어진 매핑 합산)의 *전(前) 단계*로, 세 소스의 식별자를 수집하고 결정론적 군집화로 N:1 병합 **후보 그룹을 제안**한다. 자동 병합을 강제하지 않으며(FR-1.3), 결과 화면 병합 다이얼로그의 초기 추천값을 만든다.
+- **시그니처:**
+  ```python
+  class AliasExtractor:
+      @staticmethod
+      def normalize_key(alias: str) -> str:
+          """비교용 정규화: 이메일 로컬파트 추출, 공백·`. _ -` 제거, 소문자."""
+      def extract_identifiers(self, git, docs, msgs) -> list[dict]:
+          """{raw_id, source, activity} 식별자 목록(소스별 행). (raw_id, source) 정렬."""
+      def unique_aliases(self, identifiers: list[dict]) -> list[str]:
+          """분류 라벨(Unknown 등) 제외 고유 raw_id 정렬 목록."""
+      def suggest_groups(self, aliases: list[str]) -> dict[str, list[str]]:
+          """정규화 키가 같은 alias끼리 묶어 {대표명: [alias...]}."""
+      def suggest_mapping(self, identifiers: list[dict]) -> dict[str, str]:
+          """식별자 목록 → 추천 초기 매핑 {raw_id: 대표명}."""
+  ```
+- **알고리즘:**
+  - `normalize_key()`: 이메일이면 `@` 앞만 취하고, 공백·`._-`를 제거한 뒤 소문자로 변환한다. (예: `DH-Lee`, `dh.lee`, `daehan.lee@x.com`의 로컬파트가 동일 키로 수렴.)
+  - `suggest_groups()`: 정규화 키 버킷으로 묶고, 대표명은 그룹 내에서 **(한글 포함 우선 → 길이 큰 순 → 사전순)** 1순위를 택한다. 분류 라벨(`Unknown`/빈 문자열)은 제외한다.
+  - 모든 출력은 정렬·결정론적이다(NFR-1.3). 활동 규모(`activity`)는 Git=추가 라인, 문서=글자수, 메신저=발화수로 채운다.
+- **Controller 연동(C-4):** Model이므로 View를 모른다. `AppController`가 결과 인물에 대해 `suggest_groups`로 후보(대표명≠원본인 군집)를 만들어 결과 화면(`ResultScreen.set_suggested_mapping` → `AliasMappingDialog.apply_suggested`)에 전달한다. 실제 병합은 조장 확정 시 `AliasMapper`(§2.6)가 수행한다.
+
+---
+
 ## 3. 컴포넌트 간 데이터 흐름
 
 Architecture Overview §7에 정의된 파이프라인에서 BusinessLogic 모듈의 위치를 나타낸다.
@@ -298,10 +389,12 @@ msgs: {author: count} ──┤                   │         │
 | :--- | :--- | :--- |
 | Normalizer | FR-4.1 | — |
 | CappingScaler | FR-4.2 | — |
-| AnomalySignalDetector | FR-4.2b, FR-4.2c | STR-7, ConOps P5 (판정 금지) |
+| AnomalySignalDetector | FR-4.2, FR-4.2b, FR-4.2d | STR-7, ConOps P5 (판정 금지) |
+| NormalizedSignalsTracker | FR-4.2c | STR-7 (점수 비반영), OI-1 (세션 한정) |
 | WeightPresetManager | FR-4.4 | — |
 | WeightRebalancer | FR-4.3 | — |
 | AliasMapper | FR-1.3 | — |
+| AliasExtractor | FR-1.3 | NFR-1.3 (결정론), 자동 병합 금지 |
 | ContributionAggregator | FR-4.* 통합 | NFR-3.2 (모듈 격리) |
 | CacheManager | NFR-2.3, NFR-2.4 | C-8 (pickle 금지, JSON 전용) |
 | ReportExporter | FR-5.2, FR-5.3 | STR-7 (판정 금지 용어) |
@@ -315,3 +408,4 @@ msgs: {author: count} ──┤                   │         │
 | v1.0 | 2026-05-30 | 최초 작성. 9개 BusinessLogic 컴포넌트 상세 설계. | QCE 개발팀 |
 | v1.1 | 2026-05-30 | (1) FR-4.2d → FR-4.2c 식별자 통일 (architecture-overview.md v1.1 동기화). (2) 참조 데이터 타입(§1.4) 추가. (3) 설계 불변식(§1.3) 추가 — PyQt6 금지, 파서 직접 import 금지, 판정 금지, 결정론 보장. (4) AliasMapper에 Unknown vs 미매핑 용어 구분 명시. (5) CacheManager에 저장 항목 화이트리스트 및 원자적 쓰기 절차 상세 추가. (6) ReportExporter에 경고 문구 형식 사양 추가. (7) 컴포넌트 간 데이터 흐름도(§3) 추가. (8) 아키텍처 RTM(§4) 추가. (9) 각 클래스에 코드 블록 형태의 시그니처 추가. | QCE 개발팀 |
 | **v1.2** | **2026-05-31** | **(1) AliasMapper §2.6에 호출 방식 명시 — 1차 분석=항등 매핑, 병합 재집계=결과 화면 사후 재호출 (FR-1.3 개정, Controller Design v1.1 §4 연동). (2) ContributionAggregator §2.7에 병합 재집계 경로 및 재정규화 필요성 명시 (FR-5.7). (3) ContributionAggregator §2.7에 출력 소비 방식(INV-V1 — asdict 직렬화는 Controller 책임) 명시. (4) 상위 문서 목록에 Controller Design v1.1 추가.** | QCE 개발팀 |
+| **v1.3** | **2026-05-31** | **구 SRS.md 폐지 반영 및 구현분 정합화(A1~A4). (1) §1.4 데이터 타입을 실제 코드 필드명으로 정합화(`raw_chars`·`raw_messages`·`signals`) 및 신규 필드 `signal_details`·`commit_dates`, `CommitStats.commits_list` 추가 + signal_details 원소 구조 명세. (2) §2.3 AnomalySignalDetector에 `detect_capping`·`detect_zscore_detail`·`build_signal_details` 추가, 실현 FR에 FR-4.2·FR-4.2d(Z-Score) 반영. (3) §2.4 WeightPresetManager에 `normalize`·`redistribute`·`match_preset`·`clamp`·`get_preset`·`preset_names` 추가(FR-4.4 보조 연산). (4) **§2.10 NormalizedSignalsTracker 신설(FR-4.2c 예외 처리)** — 번호 체계 4.2c=예외·4.2d=Z-Score (RR v1.5 정합). (5) **§2.11 AliasExtractor 신설(FR-1.3 결정론적 병합 후보 제안)**. (6) §2.6 AliasMapper에 AliasExtractor 후보 제안 연동 명시. (7) §4 RTM에 NormalizedSignalsTracker·AliasExtractor 행 추가. 상세 View 설계는 view-design.md, Controller 배선은 controller-design.md 참조.** | QCE 개발팀 |
