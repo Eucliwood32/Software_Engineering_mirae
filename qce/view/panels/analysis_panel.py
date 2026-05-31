@@ -49,6 +49,7 @@ class AnalysisPanel(QWidget):
 
         # 슬라이더 3개 (git/doc/msg)
         self._sliders: dict[str, QSlider] = {}
+        self._value_labels: dict[str, QLabel] = {}
         for key, label in (("w_git", "Git"), ("w_doc", "문서"), ("w_msg", "메신저")):
             row = QHBoxLayout()
             row.addWidget(QLabel(label))
@@ -56,9 +57,17 @@ class AnalysisPanel(QWidget):
             s.setRange(0, _TICKS)
             s.setSingleStep(1)
             s.setPageStep(1)
-            s.valueChanged.connect(self._on_slider_changed)
+            # valueChanged 대신 사용자 조작인 sliderMoved에 연결
+            s.sliderMoved.connect(lambda val, k=key: self._on_slider_dragged(k, val))
             self._sliders[key] = s
             row.addWidget(s)
+
+            v_label = QLabel("0.00")
+            v_label.setMinimumWidth(35)
+            v_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            self._value_labels[key] = v_label
+            row.addWidget(v_label)
+
             root.addLayout(row)
 
         self._sum_label = QLabel("")
@@ -111,8 +120,42 @@ class AnalysisPanel(QWidget):
         s.blockSignals(True)
         s.setValue(int(round(value / _STEP)))
         s.blockSignals(False)
+        if hasattr(self, "_value_labels"):
+            self._value_labels[key].setText(f"{value:.2f}")
 
-    def _on_slider_changed(self, _value: int) -> None:
+    def _on_slider_dragged(self, changed_key: str, value: int) -> None:
+        new_val = value * _STEP
+        current = self.current_weights()
+        fixed_val = max(0.0, min(1.0, new_val))
+        
+        remaining = 1.0 - fixed_val
+        other_keys = [k for k in ["w_git", "w_doc", "w_msg"] if k != changed_key]
+        other_sum = sum(current.get(k, 0.0) for k in other_keys)
+        
+        result = {changed_key: fixed_val}
+        if other_sum == 0:
+            for k in other_keys:
+                result[k] = remaining / len(other_keys)
+        else:
+            for k in other_keys:
+                ratio = current.get(k, 0.0) / other_sum
+                result[k] = remaining * ratio
+                
+        # Grid snap
+        grid_result = {}
+        for k, v in result.items():
+            grid_result[k] = round(v / _STEP) * _STEP
+            
+        # Fix sum error due to grid snap
+        grid_sum = sum(grid_result.values())
+        diff_steps = round((1.0 - grid_sum) / _STEP)
+        if diff_steps != 0:
+            last_key = other_keys[-1]
+            grid_result[last_key] = max(0.0, grid_result[last_key] + diff_steps * _STEP)
+                
+        for k, v in grid_result.items():
+            self._set_silently(k, v)
+            
         self._refresh_sum_label()
         self.weights_changed.emit(self.current_weights())
 

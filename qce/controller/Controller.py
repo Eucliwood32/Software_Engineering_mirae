@@ -255,6 +255,7 @@ class AppController:
         if self.tracker:
             self.tracker.clear()
         self._last_scores = []
+        self.main_window.submit.reset()
         self.main_window.show_submit()
 
     def on_signal_dismissed(self, author: str, signal_type: str, ref: str) -> None:
@@ -275,7 +276,7 @@ class AppController:
             scores = self.tracker.apply(self._last_scores)
             
         score_dicts = [dataclasses.asdict(s) for s in scores]
-        self.main_window.result_screen.render(score_dicts, set())
+        self.main_window.result.render(score_dicts, set())
         
         if self.alias_extractor:
             identifiers = self.alias_extractor.extract_identifiers(
@@ -284,8 +285,8 @@ class AppController:
                 self.orchestrator._raw_msgs
             )
             mapping = self.alias_extractor.suggest_mapping(identifiers)
-            if hasattr(self.main_window.result_screen, "set_suggested_mapping"):
-                self.main_window.result_screen.set_suggested_mapping(mapping)
+            if hasattr(self.main_window.result, "set_suggested_mapping"):
+                self.main_window.result.set_suggested_mapping(mapping)
 
     def on_analysis_failed(self, message: str) -> None:
         print(f"FATAL ERROR EMITTED: {message}")

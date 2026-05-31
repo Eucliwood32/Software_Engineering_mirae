@@ -60,3 +60,29 @@ def test_weights_changed_emitted(qtbot):
     with qtbot.waitSignal(p.weights_changed, timeout=1000) as blocker:
         p.apply_preset("개발 중심")
     assert blocker.args[0] == {"w_git": 0.60, "w_doc": 0.25, "w_msg": 0.15}
+
+
+def test_slider_auto_balancing(qtbot):
+    p = AnalysisPanel()
+    qtbot.addWidget(p)
+    p.apply_preset("균형 설정")  # 0.40, 0.40, 0.20
+    
+    # Simulate user dragging w_git from 0.40 to 0.60 (value: 12)
+    s = p._sliders["w_git"]
+    s.sliderMoved.emit(12)
+    
+    weights = p.current_weights()
+    assert weights["w_git"] == 0.60
+    assert weights["w_doc"] == 0.25
+    assert weights["w_msg"] == 0.15
+    assert sum(weights.values()) == 1.0
+
+
+def test_slider_value_labels(qtbot):
+    p = AnalysisPanel()
+    qtbot.addWidget(p)
+    p.apply_preset("균형 설정")
+    
+    assert p._value_labels["w_git"].text() == "0.40"
+    assert p._value_labels["w_doc"].text() == "0.40"
+    assert p._value_labels["w_msg"].text() == "0.20"
