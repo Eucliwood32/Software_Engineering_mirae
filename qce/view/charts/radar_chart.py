@@ -19,6 +19,9 @@ from qce.view.contract import (
     SRC_DOC,
     SRC_GIT,
     SRC_MSG,
+    K_RAW_ADD,
+    K_RAW_CHAR,
+    K_RAW_MSG,
 )
 from qce.view.style import tokens as T
 
@@ -127,7 +130,8 @@ class RadarChartWidget(BaseChartWidget):
         self.canvas.draw_idle()
 
     def _build_tooltip(self, m: dict, axis: str = "") -> str:
-        return f"{m[K_AUTHOR]} · {axis}"
+        base = f"{m[K_AUTHOR]} · {axis}"
+        return f"{base}\nGit 코드: {m.get(K_RAW_ADD, 0)}\n문서 양: {m.get(K_RAW_CHAR, 0)}\n메신저 대화: {m.get(K_RAW_MSG, 0)}"
 
     # ------------------------------------------------------------------ #
     # 테스트 접근자

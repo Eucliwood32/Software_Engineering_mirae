@@ -130,6 +130,12 @@ class SubmitScreen(QWidget):
     def _refresh_loaded_label(self) -> None:
         self._loaded_label.setText(f"문서 {self._doc_count}개 · 메신저 {self._msg_count}개 적재됨")
 
+    def reset(self) -> None:
+        """이전 분석 입력값(문서, 메신저 개수 등)을 초기화한다."""
+        self._doc_count = 0
+        self._msg_count = 0
+        self._loaded_label.setText("")
+
     # --- 테스트 접근자 ---
     def loaded_summary(self) -> str:
         return self._loaded_label.text()

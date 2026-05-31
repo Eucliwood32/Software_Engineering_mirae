@@ -45,7 +45,7 @@ class AliasMappingDialog(QDialog):
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
         buttons.accepted.connect(self._confirm)
-        buttons.rejected.connect(self.reject)
+        buttons.rejected.connect(self._reset_mapping)
         root.addWidget(buttons)
 
     def set_members(self, members: list[str]) -> None:
@@ -110,6 +110,11 @@ class AliasMappingDialog(QDialog):
     def _confirm(self) -> None:
         self.mapping_confirmed.emit(self.current_mapping())
         self.accept()
+
+    def _reset_mapping(self) -> None:
+        """취소 버튼 클릭 시 다이얼로그를 닫지 않고 선택값을 미지정으로 되돌린다."""
+        for combo in self._combos.values():
+            combo.setCurrentText(PLACEHOLDER)
 
     def _update_row_style(self, raw_id: str) -> None:
         label = self._row_labels.get(raw_id)

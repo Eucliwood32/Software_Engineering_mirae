@@ -53,3 +53,17 @@ def test_has_analysis_panel(qtbot):                             # TC-FR-5.5-05
     assert isinstance(w.analysis_panel, AnalysisPanel)
     w.analysis_panel.set_analyze_enabled(False)
     assert w.analysis_panel.analyze_enabled() is False
+
+
+def test_reset_clears_counts(qtbot):
+    p = SubmitScreen()
+    qtbot.addWidget(p)
+    p._handle_dropped_paths(["a.docx", "b.pptx", "c.txt"])
+    assert p._doc_count == 2
+    assert p._msg_count == 1
+    assert "적재됨" in p.loaded_summary()
+    
+    p.reset()
+    assert p._doc_count == 0
+    assert p._msg_count == 0
+    assert p.loaded_summary() == ""

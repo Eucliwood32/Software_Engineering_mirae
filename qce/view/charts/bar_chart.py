@@ -16,6 +16,9 @@ from qce.view.contract import (
     K_GIT,
     K_MSG,
     K_TOTAL,
+    K_RAW_ADD,
+    K_RAW_CHAR,
+    K_RAW_MSG,
 )
 from qce.view.style import tokens as T
 
@@ -77,12 +80,11 @@ class BarChartWidget(BaseChartWidget):
 
     @staticmethod
     def _tooltip_fields(m: dict) -> list[str]:
-        # 6항목: 팀원명 / Git / 문서 / 메신저 / 종합 / Capping 발동 여부
         return [
             f"{m[K_AUTHOR]}",
-            f"Git {float(m[K_GIT]):.2f}",
-            f"문서 {float(m[K_DOC]):.2f}",
-            f"메신저 {float(m[K_MSG]):.2f}",
+            f"Git {float(m[K_GIT]):.2f} (코드 양: {m.get(K_RAW_ADD, 0)})",
+            f"문서 {float(m[K_DOC]):.2f} (문서 양: {m.get(K_RAW_CHAR, 0)})",
+            f"메신저 {float(m[K_MSG]):.2f} (대화 수: {m.get(K_RAW_MSG, 0)})",
             f"종합 {float(m[K_TOTAL]):.2f}",
             f"Capping {'발동' if m[K_CAPPING] else '미발동'}",
         ]

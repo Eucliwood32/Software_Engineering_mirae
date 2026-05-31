@@ -19,12 +19,15 @@ from qce.view.panels.submit_screen import SubmitScreen
 from qce.view.style.qss import app_stylesheet
 
 
+from PyQt6.QtGui import QIcon
+
 class MainWindow(QMainWindow):
     save_report_requested = pyqtSignal()
 
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("QCE — 부탁해 꼬마선장")
+        self.setWindowIcon(QIcon("assets/logo.png"))
         self.setStyleSheet(app_stylesheet())
 
         self.stack = QStackedWidget()

@@ -79,3 +79,17 @@ def test_mapping_confirmed_signal(qtbot):
     with qtbot.waitSignal(dlg.mapping_confirmed, timeout=1000) as blocker:
         dlg._confirm()
     assert blocker.args[0] == {"dh-lee": "이대한"}
+
+def test_cancel_resets_mapping(qtbot):
+    dlg = AliasMappingDialog()
+    qtbot.addWidget(dlg)
+    dlg.set_members(["이대한"])
+    dlg.populate(_identifiers())
+    dlg.combo_for("dh-lee").setCurrentText("이대한")
+    
+    # Cancel 버튼 클릭
+    dlg._reset_mapping()
+    
+    # 모두 PLACEHOLDER로 초기화되었는지 확인
+    assert dlg.combo_for("dh-lee").currentText() == PLACEHOLDER
+    assert "dh-lee" not in dlg.current_mapping()
