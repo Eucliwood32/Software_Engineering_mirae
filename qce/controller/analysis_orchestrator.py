@@ -100,18 +100,21 @@ class _MergeWorker(QRunnable):
 
             merged_git: dict | None = None
             if self.git is not None:
-                raw = {k: {"additions": v.additions, "commits": v.commits,
-                           "deletions": v.deletions}
-                       for k, v in self.git.items()}
-                mapped = mapper.merge(raw, self.mapping)
-                merged_git = {
-                    person: CommitStats(
-                        commits=vals.get("commits", 0),
-                        additions=vals.get("additions", 0),
-                        deletions=vals.get("deletions", 0),
+                # AliasMapper는 commits_list(리스트)를 합산하지 못하므로 git은 직접 병합한다.
+                # 미매핑 alias는 제외(AliasMapper와 동일 의미). commits_list는 이어붙여
+                # 보존 → EW-02 빈도 신호가 매핑 후에도 동작한다.
+                merged_git = {}
+                for alias, stats in self.git.items():
+                    person = self.mapping.get(alias)
+                    if person is None:
+                        continue
+                    prev = merged_git.get(person) or CommitStats(0, 0, 0, [])
+                    merged_git[person] = CommitStats(
+                        prev.commits + stats.commits,
+                        prev.additions + stats.additions,
+                        prev.deletions + stats.deletions,
+                        prev.commits_list + stats.commits_list,
                     )
-                    for person, vals in mapped.items()
-                }
 
             merged_doc: dict | None = None
             if self.docs is not None:
@@ -148,7 +151,9 @@ class AnalysisOrchestrator(QObject):
     def __init__(self) -> None:
         super().__init__()
         self.is_analyzing: bool = False
-        self._pool = QThreadPool.globalInstance()
+        pool = QThreadPool.globalInstance()
+        assert pool is not None      # 전역 풀은 항상 존재 (타입 내로잉)
+        self._pool = pool
         self._raw_git = None
         self._raw_docs = None
         self._raw_msgs = None

@@ -54,12 +54,26 @@ class ContributionAggregator:
         raw_doc = [docs.get(a, 0) if docs else 0 for a in authors]
         raw_msg = [msgs.get(a, 0) if msgs else 0 for a in authors]
 
-        # 5. Git Capping + Log Scaling
+        # 5. Git Capping + Log Scaling (FR-4.2 / EW-01: 캡핑은 "단일 커밋" 단위)
+        #    커밋별 추가줄을 1000으로 제한해 합산 → 로그 스케일. commits_list가
+        #    없으면(구버전·병합 누락) 총합 캡핑으로 폴백한다.
         log_add, cap_flags = [], []
-        for add in raw_add:
-            capped, is_capped = self.capping_scaler.cap(add)
-            cap_flags.append(is_capped)
-            log_add.append(self.capping_scaler.log_scale(capped))
+        for a in authors:
+            stats = git.get(a) if git else None
+            if stats is not None and stats.commits_list:
+                capped_sum = 0
+                any_capped = False
+                for c in stats.commits_list:
+                    cv, flag = self.capping_scaler.cap(c.get("additions", 0))
+                    capped_sum += cv
+                    any_capped = any_capped or flag
+                cap_flags.append(any_capped)
+                log_add.append(self.capping_scaler.log_scale(capped_sum))
+            else:
+                add = stats.additions if stats is not None else 0
+                capped, is_capped = self.capping_scaler.cap(add)
+                cap_flags.append(is_capped)
+                log_add.append(self.capping_scaler.log_scale(capped))
 
         # 6. Min-Max 정규화
         git_norm = self.normalizer.normalize(log_add) if git is not None else [0.0] * len(authors)

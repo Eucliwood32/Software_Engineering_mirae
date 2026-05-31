@@ -19,6 +19,10 @@ dist/
 .qce_cache.tmp
 qce_error.log
 
+# 분석 입력(민감) — 실제 메신저 대화 로그는 커밋 금지
+chat.txt
+*_group.txt
+
 # IDE
 .idea/
 *.swp
