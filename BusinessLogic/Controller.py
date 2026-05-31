@@ -4,10 +4,20 @@ from typing import Optional, List, Dict, Any, Tuple
 # pyrefly: ignore [missing-import]
 from PyQt6.QtCore import QObject, pyqtSignal, QRunnable, QThreadPool
 
-# 향후 개발 시 BusinessLogic 및 Models 내 실제 파서/집계기 import 필요
-# from BusinessLogic.Parsers import DocumentParser, GitAnalyzer, MessengerParser
-# from BusinessLogic.BusinessLogic import ContributionAggregator, AliasMapper, CacheManager
-# from BusinessLogic.DataTypes import MemberScore
+try:
+    from .Parsers import DocumentParser, GitAnalyzer, MessengerParser
+except ImportError:
+    # Testing or decoupled
+    DocumentParser = GitAnalyzer = MessengerParser = None
+
+try:
+    from .BusinessLogic import (
+        ContributionAggregator, AliasMapper, CacheManager,
+        NormalizedSignalsTracker, AliasExtractor
+    )
+except ImportError:
+    ContributionAggregator = AliasMapper = CacheManager = NormalizedSignalsTracker = AliasExtractor = None
+
 
 class AnalysisWorkerSignals(QObject):
     progress = pyqtSignal(int)          # 0~100 진행률
@@ -23,15 +33,22 @@ class AnalysisWorker(QRunnable):
         self.config = config
         self.signals = AnalysisWorkerSignals()
 
+    def _create_identity_mapping(self, git, docs, msgs) -> dict:
+        aliases = set()
+        if git: aliases.update(git.keys())
+        if docs: aliases.update(docs.keys())
+        if msgs: aliases.update(msgs.keys())
+        return {a: a for a in aliases}
+
     def run(self):
         try:
             self.signals.progress.emit(5)
-            doc_parser = DocumentParser() if 'DocumentParser' in globals() else None
-            git_analyzer = GitAnalyzer() if 'GitAnalyzer' in globals() else None
-            msg_parser = MessengerParser() if 'MessengerParser' in globals() else None
-            alias_mapper = AliasMapper() if 'AliasMapper' in globals() else None
-            aggregator = ContributionAggregator() if 'ContributionAggregator' in globals() else None
-            cache_manager = CacheManager() if 'CacheManager' in globals() else None
+            doc_parser = DocumentParser() if DocumentParser else globals().get('DocumentParser')() if 'DocumentParser' in globals() else None
+            git_analyzer = GitAnalyzer() if GitAnalyzer else globals().get('GitAnalyzer')() if 'GitAnalyzer' in globals() else None
+            msg_parser = MessengerParser() if MessengerParser else globals().get('MessengerParser')() if 'MessengerParser' in globals() else None
+            alias_mapper = AliasMapper() if AliasMapper else globals().get('AliasMapper')() if 'AliasMapper' in globals() else None
+            aggregator = ContributionAggregator() if ContributionAggregator else globals().get('ContributionAggregator')() if 'ContributionAggregator' in globals() else None
+            cache_manager = CacheManager() if CacheManager else globals().get('CacheManager')() if 'CacheManager' in globals() else None
             
             self.signals.progress.emit(10)
             doc_data = None
@@ -51,24 +68,34 @@ class AnalysisWorker(QRunnable):
             if msg_parser:
                 try: 
                     parse_result = msg_parser.parse(self.config.get('msg_path', ''))
-                    msg_data = parse_result.records
+                    msg_counts = {}
+                    for rec in parse_result.records:
+                        if hasattr(rec, 'author'):
+                            msg_counts[rec.author] = msg_counts.get(rec.author, 0) + 1
+                        elif isinstance(rec, str):
+                            msg_counts["Unknown"] = msg_counts.get("Unknown", 0) + 1
+                    msg_data = msg_counts
                 except Exception as e: print(f"Messenger parsing error (ignored): {e}")
             self.signals.progress.emit(70)
             
-            mapped_data = {}
+            mapped_git = git_data
+            mapped_docs = doc_data
+            mapped_msgs = msg_data
+            
             if alias_mapper:
-                raw_data = {"docs": doc_data, "git": git_data, "msg": msg_data}
-                # 1차 분석은 항상 항등 매핑 (빈 mapping을 전달하면 AliasMapper가 각 alias를 독립 인물로 처리한다고 가정)
-                mapped_data = alias_mapper.merge(raw_data, {})
+                identity = self._create_identity_mapping(git_data, doc_data, msg_data)
+                mapped_git = alias_mapper.merge(git_data, identity) if git_data else None
+                mapped_docs = alias_mapper.merge(doc_data, identity) if doc_data else None
+                mapped_msgs = alias_mapper.merge(msg_data, identity) if msg_data else None
             
             self.signals.progress.emit(85)
             scores = []
             weights = self.config.get('weights', {"git": 0.4, "docs": 0.4, "msg": 0.2})
             if aggregator:
                 scores = aggregator.aggregate(
-                    git=mapped_data.get("git"),
-                    docs=mapped_data.get("docs"),
-                    msgs=mapped_data.get("msg"),
+                    git=mapped_git,
+                    docs=mapped_docs,
+                    msgs=mapped_msgs,
                     weights=weights
                 )
             
@@ -104,23 +131,28 @@ class MergeWorker(QRunnable):
     def run(self):
         try:
             self.signals.progress.emit(10)
-            alias_mapper = AliasMapper() if 'AliasMapper' in globals() else None
-            aggregator = ContributionAggregator() if 'ContributionAggregator' in globals() else None
-            cache_manager = CacheManager() if 'CacheManager' in globals() else None
+            alias_mapper = AliasMapper() if AliasMapper else globals().get('AliasMapper')() if 'AliasMapper' in globals() else None
+            aggregator = ContributionAggregator() if ContributionAggregator else globals().get('ContributionAggregator')() if 'ContributionAggregator' in globals() else None
+            cache_manager = CacheManager() if CacheManager else globals().get('CacheManager')() if 'CacheManager' in globals() else None
             
             self.signals.progress.emit(30)
-            mapped_data = {}
+            
+            mapped_git = self.raw_git
+            mapped_docs = self.raw_docs
+            mapped_msgs = self.raw_msgs
+            
             if alias_mapper:
-                raw_data = {"docs": self.raw_docs, "git": self.raw_git, "msg": self.raw_msgs}
-                mapped_data = alias_mapper.merge(raw_data, self.mapping)
+                mapped_git = alias_mapper.merge(self.raw_git, self.mapping) if self.raw_git else None
+                mapped_docs = alias_mapper.merge(self.raw_docs, self.mapping) if self.raw_docs else None
+                mapped_msgs = alias_mapper.merge(self.raw_msgs, self.mapping) if self.raw_msgs else None
             
             self.signals.progress.emit(60)
             scores = []
             if aggregator:
                 scores = aggregator.aggregate(
-                    git=mapped_data.get("git"),
-                    docs=mapped_data.get("docs"),
-                    msgs=mapped_data.get("msg"),
+                    git=mapped_git,
+                    docs=mapped_docs,
+                    msgs=mapped_msgs,
                     weights=self.weights
                 )
             
@@ -131,7 +163,8 @@ class MergeWorker(QRunnable):
             self.signals.progress.emit(100)
             self.signals.completed.emit(scores)
         except Exception as e:
-            self.signals.failed.emit(str(e))
+            err_msg = f"병합 중 치명적 오류 발생: {str(e)}\n{traceback.format_exc()}"
+            self.signals.failed.emit(err_msg)
 
 
 class AnalysisOrchestrator(QObject):
@@ -197,8 +230,12 @@ class AppController:
         self.orchestrator.completed.connect(self.on_analysis_completed)
         self.orchestrator.failed.connect(self.on_analysis_failed)
         self.orchestrator.progress.connect(self.on_progress)
+        
+        self.tracker = NormalizedSignalsTracker() if NormalizedSignalsTracker else globals().get('NormalizedSignalsTracker')() if 'NormalizedSignalsTracker' in globals() else None
+        self.alias_extractor = AliasExtractor() if AliasExtractor else globals().get('AliasExtractor')() if 'AliasExtractor' in globals() else None
+        self._last_scores = []
 
-    def route_event(self, event: str, payload: dict) -> None:
+    def route_event(self, event: str, payload: Any = None) -> None:
         if event == "start_analysis":
             self.main_window.show_loading()
             self.orchestrator.start_analysis(payload)
@@ -206,21 +243,52 @@ class AppController:
             self.on_merge_requested(payload)
         elif event == "new_analysis_requested":
             self.on_new_analysis_requested()
+        elif event == "signal_dismissed":
+            author, sig_type, ref = payload
+            self.on_signal_dismissed(author, sig_type, ref)
 
     def on_merge_requested(self, mapping: dict) -> None:
         self.main_window.show_loading()
         self.orchestrator.start_merge_reaggregation(mapping)
 
     def on_new_analysis_requested(self) -> None:
+        if self.tracker:
+            self.tracker.clear()
+        self._last_scores = []
         self.main_window.show_submit()
 
+    def on_signal_dismissed(self, author: str, signal_type: str, ref: str) -> None:
+        if self.tracker:
+            self.tracker.dismiss(author, signal_type, ref)
+        self._render_results()
+
     def on_analysis_completed(self, scores: list) -> None:
-        # INV-V1: MemberScore를 dict로 변환
+        self._last_scores = scores
+        if self.tracker:
+            self.tracker.clear()
+        self._render_results()
+        self.main_window.show_result()
+        
+    def _render_results(self) -> None:
+        scores = self._last_scores
+        if self.tracker:
+            scores = self.tracker.apply(self._last_scores)
+            
         score_dicts = [dataclasses.asdict(s) for s in scores]
         self.main_window.result_screen.render(score_dicts, set())
-        self.main_window.show_result()
+        
+        if self.alias_extractor:
+            identifiers = self.alias_extractor.extract_identifiers(
+                self.orchestrator._raw_git,
+                self.orchestrator._raw_docs,
+                self.orchestrator._raw_msgs
+            )
+            mapping = self.alias_extractor.suggest_mapping(identifiers)
+            if hasattr(self.main_window.result_screen, "set_suggested_mapping"):
+                self.main_window.result_screen.set_suggested_mapping(mapping)
 
     def on_analysis_failed(self, message: str) -> None:
+        print(f"FATAL ERROR EMITTED: {message}")
         self.main_window.show_submit()
         # self.main_window.show_error(message)
 

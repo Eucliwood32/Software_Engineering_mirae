@@ -47,9 +47,9 @@ class AliasMapper:
     def merge(self, raw: dict, mapping: dict) -> dict:
         # 매핑 여부에 따라 결과를 다르게 반환하여 L2 통합 테스트 지원
         if mapping:
-            return {"git": {}, "docs": {"MergedPerson": 100}, "msg": {"MergedPerson": 1}}
+            return {"MergedPerson": 100}
         else:
-            return {"git": {}, "docs": {"Alice": 100}, "msg": {"Alice": 1}}
+            return {"Alice": 100}
 
 class ContributionAggregator:
     def aggregate(self, git, docs, msgs, weights) -> List[MemberScore]:

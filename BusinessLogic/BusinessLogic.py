@@ -3,8 +3,8 @@ BusinessLogic.py
 
 QCE(Quantitative Contribution Evaluator) 시스템의 Model · BusinessLogic 레이어
 참조 문서: 
-- Architecture Overview v1.1
-- Model Business Logic Design v1.1
+- Architecture Overview v1.3
+- Model Business Logic Design v1.4
 - Development Constraints v2.0 (C-4, C-8)
 """
 
@@ -13,6 +13,8 @@ import json
 import os
 import io
 import csv
+import re
+import dataclasses
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set, Tuple, Union
 
@@ -25,6 +27,7 @@ class CommitStats:
     commits: int
     additions: int
     deletions: int
+    commits_list: list = field(default_factory=list)
 
 @dataclass
 class MessengerRecord:
@@ -45,10 +48,12 @@ class MemberScore:
     msg_score: float
     total_score: float
     raw_additions: int
-    raw_char_count: int
-    raw_msg_count: int
+    raw_chars: int
+    raw_messages: int
     capping_applied: bool
-    anomaly_flags: List[str] = field(default_factory=list)
+    signals: List[str] = field(default_factory=list)
+    signal_details: List[dict] = field(default_factory=list)
+    commit_dates: List[str] = field(default_factory=list)
 
 
 # ==========================================
@@ -88,43 +93,59 @@ class CappingScaler:
 
 class AnomalySignalDetector:
     """
-    FR-4.2b, FR-4.2c: 통계적/규칙적 이상 징후 식별 신호 생성.
+    FR-4.2, FR-4.2b, FR-4.2d: 통계적/규칙적 이상 징후 식별 신호 생성.
     (ConOps P5 원칙에 따라 점수에 자동 반영되지 않으며, 표시 전용 데이터입니다.)
     """
-    def detect_frequency(self, repo: Dict[str, List[dict]]) -> List[dict]:
-        """
-        EW-02: 작성자 단기 커밋 빈도가 평소 일평균의 3배 초과 구간을 신호로.
-        입력: {author: [{"date": "YYYY-MM-DD", "commits": int}, ...]}
-        반환: [{author, period, period_commits, baseline_avg}, ...]
-        """
+    def detect_frequency(self, repo: Dict[str, CommitStats]) -> List[dict]:
+        """EW-02: 작성자 단기 커밋 빈도가 평소 일평균의 3배 초과 구간을 신호로."""
         signals = []
-        for author, daily_commits in repo.items():
-            if not daily_commits:
+        for author, stats in repo.items():
+            if not stats.commits_list:
                 continue
-            # 일평균 커밋 수 산출
-            total_commits = sum(d.get("commits", 0) for d in daily_commits)
-            num_days = len(daily_commits)
-            if num_days == 0:
+            
+            daily_counts = {}
+            for c in stats.commits_list:
+                date = c.get("date", "")
+                if date:
+                    daily_counts[date] = daily_counts.get(date, 0) + 1
+                    
+            if not daily_counts:
                 continue
+                
+            num_days = len(daily_counts)
+            total_commits = sum(daily_counts.values())
             baseline_avg = total_commits / num_days
             
-            # 각 일자의 커밋 수가 일평균의 3배 초과인지 검사
-            for day_info in daily_commits:
-                day_commits = day_info.get("commits", 0)
+            for date, day_commits in daily_counts.items():
                 if baseline_avg > 0 and day_commits > baseline_avg * 3:
                     signals.append({
                         "author": author,
-                        "period": day_info.get("date", ""),
+                        "period": date,
                         "period_commits": day_commits,
                         "baseline_avg": round(baseline_avg, 4)
                     })
         return signals
 
-    def detect_zscore(self, scores: List[MemberScore]) -> List[str]:
-        """FR-4.2c: 정규화 지표 중 Z-Score ≤ -1.5 인 지표가 2개 이상인 팀원 반환"""
+    def detect_capping(self, repo: Dict[str, CommitStats]) -> List[dict]:
+        """FR-4.2: 단일 커밋 추가 라인 > 1000인 커밋을 신호로."""
+        signals = []
+        for author, stats in repo.items():
+            for c in stats.commits_list:
+                additions = c.get("additions", 0)
+                if additions > CappingScaler.CAPPING_THRESHOLD:
+                    signals.append({
+                        "author": author,
+                        "hash": c.get("hash", "")[:7],
+                        "date": c.get("date", ""),
+                        "additions": additions
+                    })
+        return signals
+
+    def detect_zscore_detail(self, scores: List[MemberScore]) -> List[dict]:
+        """FR-4.2d: 정규화 지표 중 Z-Score <= -1.5 인 지표가 2개 이상인 팀원 상세 반환"""
         if not scores:
             return []
-        
+            
         git_vals = [s.git_score for s in scores]
         doc_vals = [s.doc_score for s in scores]
         msg_vals = [s.msg_score for s in scores]
@@ -142,17 +163,51 @@ class AnomalySignalDetector:
         doc_z = calculate_zscores(doc_vals)
         msg_z = calculate_zscores(msg_vals)
         
-        flagged_authors = []
+        details = []
         for i, score in enumerate(scores):
-            anomalies = 0
-            if git_z and git_z[i] <= -1.5: anomalies += 1
-            if doc_z and doc_z[i] <= -1.5: anomalies += 1
-            if msg_z and msg_z[i] <= -1.5: anomalies += 1
+            metrics = []
+            if git_z and git_z[i] <= -1.5: metrics.append("Git")
+            if doc_z and doc_z[i] <= -1.5: metrics.append("문서")
+            if msg_z and msg_z[i] <= -1.5: metrics.append("메신저")
             
-            if anomalies >= 2:
-                flagged_authors.append(score.author)
+            if len(metrics) >= 2:
+                details.append({
+                    "author": score.author,
+                    "metrics": metrics
+                })
+        return details
+
+    def detect_zscore(self, scores: List[MemberScore]) -> List[str]:
+        return [d["author"] for d in self.detect_zscore_detail(scores)]
+
+    def build_signal_details(
+        self, repo: Optional[Dict[str, CommitStats]], scores: List[MemberScore]
+    ) -> Dict[str, List[dict]]:
+        result = {s.author: [] for s in scores}
+        
+        if repo:
+            capping_signals = self.detect_capping(repo)
+            for sig in capping_signals:
+                author = sig.pop("author")
+                if author in result:
+                    sig["type"] = "CAPPING"
+                    result[author].append(sig)
+                    
+            freq_signals = self.detect_frequency(repo)
+            for sig in freq_signals:
+                author = sig.pop("author")
+                if author in result:
+                    sig["type"] = "EW-02"
+                    result[author].append(sig)
+                    
+        zscore_signals = self.detect_zscore_detail(scores)
+        for sig in zscore_signals:
+            author = sig.pop("author")
+            if author in result:
+                sig["type"] = "ZSCORE"
+                result[author].append(sig)
                 
-        return flagged_authors
+        return result
 
 
 class WeightPresetManager:
@@ -166,6 +221,73 @@ class WeightPresetManager:
     def validate_sum(self, w_git: float, w_doc: float, w_msg: float) -> bool:
         """부동소수점 오차 ±0.0001 허용하여 합계가 1.0인지 검증"""
         return abs(w_git + w_doc + w_msg - 1.0) < 0.0001
+
+    def preset_names(self) -> List[str]:
+        return list(self.PRESETS.keys())
+
+    def get_preset(self, name: str) -> Dict[str, float]:
+        if name in self.PRESETS:
+            g, d, m = self.PRESETS[name]
+            return {"git": g, "doc": d, "msg": m}
+        return {"git": 0.4, "doc": 0.4, "msg": 0.2}
+
+    def match_preset(self, w_git: float, w_doc: float, w_msg: float) -> Optional[str]:
+        for name, (g, d, m) in self.PRESETS.items():
+            if abs(w_git - g) < 1e-4 and abs(w_doc - d) < 1e-4 and abs(w_msg - m) < 1e-4:
+                return name
+        return None
+
+    @staticmethod
+    def clamp(value: float) -> float:
+        return max(0.0, min(1.0, value))
+
+    def normalize(self, weights: Dict[str, float]) -> Dict[str, float]:
+        keys = ["git", "doc", "msg"]
+        vals = [max(0.0, weights.get(k, 0.0)) for k in keys]
+        total = sum(vals)
+        if total == 0:
+            vals = [1/3, 1/3, 1/3]
+        else:
+            vals = [v / total for v in vals]
+            
+        result = {}
+        for i, k in enumerate(keys):
+            result[k] = round(vals[i], 4)
+            
+        current_sum = sum(result.values())
+        diff = 1.0 - current_sum
+        if abs(diff) > 0:
+            result["msg"] = round(result["msg"] + diff, 4)
+            
+        return result
+
+    def redistribute(self, changed_key: str, new_value: float, current: Dict[str, float]) -> Dict[str, float]:
+        fixed_val = self.clamp(new_value)
+        result = {changed_key: fixed_val}
+        
+        remaining = 1.0 - fixed_val
+        other_keys = [k for k in ["git", "doc", "msg"] if k != changed_key]
+        
+        other_sum = sum(max(0.0, current.get(k, 0.0)) for k in other_keys)
+        
+        if other_sum == 0:
+            for k in other_keys:
+                result[k] = remaining / len(other_keys)
+        else:
+            for k in other_keys:
+                ratio = max(0.0, current.get(k, 0.0)) / other_sum
+                result[k] = remaining * ratio
+                
+        for k in result:
+            result[k] = round(result[k], 4)
+            
+        current_sum = sum(result.values())
+        diff = 1.0 - current_sum
+        if abs(diff) > 0:
+            last_key = other_keys[-1]
+            result[last_key] = round(result[last_key] + diff, 4)
+            
+        return result
 
 
 class WeightRebalancer:
@@ -182,7 +304,6 @@ class WeightRebalancer:
                 if available_sum > 0:
                     rebalanced[k] = v / available_sum
                 else:
-                    # 기존 비율이 모두 0이었던 경우 1/N 배분
                     rebalanced[k] = 1.0 / len(available)
             else:
                 rebalanced[k] = 0.0
@@ -192,21 +313,30 @@ class WeightRebalancer:
 
 class AliasMapper:
     """FR-1.3: 파싱된 원시 식별자를 조장이 지정한 단일 팀원(Person)으로 N:1 병합"""
-    def merge(self, raw: Dict[str, dict], mapping: Dict[str, str]) -> Dict[str, dict]:
+    def merge(self, raw: dict, mapping: dict) -> dict:
         merged = {}
         for alias, metrics in raw.items():
             if alias not in mapping:
-                continue  # 미매핑 alias는 결과에서 제외
-                
-            person = mapping[alias]
-            if person not in merged:
-                merged[person] = {}
-                
-            for m_key, m_val in metrics.items():
-                if m_key not in merged[person]:
-                    merged[person][m_key] = 0
-                merged[person][m_key] += m_val
-                
+                continue
+            target = mapping[alias]
+            if target not in merged:
+                if hasattr(metrics, "commits"):
+                    merged[target] = type(metrics)(0, 0, 0, [])
+                elif isinstance(metrics, (int, float)):
+                    merged[target] = 0
+                else:
+                    merged[target] = {}
+            
+            if hasattr(metrics, "commits"):
+                merged[target].commits += metrics.commits
+                merged[target].additions += metrics.additions
+                merged[target].deletions += metrics.deletions
+                merged[target].commits_list.extend(metrics.commits_list)
+            elif isinstance(metrics, (int, float)):
+                merged[target] += metrics
+            else:
+                for k, v in metrics.items():
+                    merged[target][k] = merged[target].get(k, 0) + v
         return merged
 
 
@@ -223,10 +353,6 @@ class ContributionAggregator:
                   docs: Optional[Dict[str, int]] = None,
                   msgs: Optional[Dict[str, int]] = None,
                   weights: Optional[Dict[str, float]] = None) -> List[MemberScore]:
-        """
-        가용 소스만으로 종합 점수 산출(NFR-3.2). 
-        None 소스는 WeightRebalancer 경유.
-        """
         if weights is None:
             weights = {"git": 0.4, "doc": 0.4, "msg": 0.2}
         
@@ -252,12 +378,21 @@ class ContributionAggregator:
             author_set |= set(msgs.keys())
         authors = sorted(list(author_set))
         
-        # 4. 원시 값 추출
+        # 4. 원시 값 추출 및 커밋 일자 추출
         raw_additions = []
         raw_docs_vals = []
         raw_msgs_vals = []
+        commit_dates_list = []
+        
         for a in authors:
-            raw_additions.append(git[a].additions if (git is not None and a in git) else 0)
+            if git is not None and a in git:
+                raw_additions.append(git[a].additions)
+                dates = sorted(list(set(c.get("date", "") for c in git[a].commits_list if c.get("date"))))
+                commit_dates_list.append(dates)
+            else:
+                raw_additions.append(0)
+                commit_dates_list.append([])
+                
             raw_docs_vals.append(docs.get(a, 0) if docs is not None else 0)
             raw_msgs_vals.append(msgs.get(a, 0) if msgs is not None else 0)
         
@@ -281,7 +416,6 @@ class ContributionAggregator:
             d = doc_norm[i]
             m = msg_norm[i]
             
-            # 종합 점수 산출 (보정된 가중치 적용)
             total = (g * rebalanced.get('git', 0.0)) + \
                     (d * rebalanced.get('doc', 0.0)) + \
                     (m * rebalanced.get('msg', 0.0))
@@ -293,51 +427,50 @@ class ContributionAggregator:
                 msg_score=m,
                 total_score=round(total, 4),
                 raw_additions=raw_additions[i],
-                raw_char_count=raw_docs_vals[i],
-                raw_msg_count=raw_msgs_vals[i],
+                raw_chars=raw_docs_vals[i],
+                raw_messages=raw_msgs_vals[i],
                 capping_applied=capping_flags[i],
-                anomaly_flags=[]
+                signals=[],
+                signal_details=[],
+                commit_dates=commit_dates_list[i]
             )
             scores.append(score_obj)
             
-        # 8. 신호탐지 실행 및 플래그 갱신 (점수 미반영 — STR-7, ConOps P5)
-        z_score_anomalies = self.anomaly_detector.detect_zscore(scores)
+        # 8. 신호탐지 실행 및 플래그 갱신
+        details = self.anomaly_detector.build_signal_details(git, scores)
+        
         for s in scores:
-            if s.author in z_score_anomalies:
-                s.anomaly_flags.append("ZSCORE")
-            if s.capping_applied:
-                s.anomaly_flags.append("CAPPING")
+            if s.author in details:
+                s.signal_details = details[s.author]
+                s.signals = sorted(list(set(d.get("type") for d in s.signal_details)))
                 
         return scores
 
 
 class CacheManager:
-    """NFR-2.3, NFR-2.4, C-8: 원자적 JSON 캐싱 시스템 (pickle 사용 철저히 배제)"""
+    """NFR-2.3, NFR-2.4, C-8: 원자적 JSON 캐싱 시스템"""
     CACHE_FILE = ".qce_cache"
     TMP_FILE = ".qce_cache.tmp"
 
     def save(self, data: dict) -> None:
-        """tmp 쓰기 → fsync → os.replace 원자적 커밋. json만 사용."""
         try:
             with open(self.TMP_FILE, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
                 f.flush()
                 os.fsync(f.fileno())
-            os.replace(self.TMP_FILE, self.CACHE_FILE)  # 원자적 덮어쓰기
+            os.replace(self.TMP_FILE, self.CACHE_FILE)
         except Exception as e:
             if os.path.exists(self.TMP_FILE):
                 os.remove(self.TMP_FILE)
             raise e
             
     def load(self) -> dict:
-        """JSONDecodeError/KeyError → 파일 삭제 + 빈 dict 반환."""
         if not os.path.exists(self.CACHE_FILE):
             return {}
         try:
             with open(self.CACHE_FILE, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except (json.JSONDecodeError, KeyError, UnicodeDecodeError):
-            # 손상 캐시 삭제
             if os.path.exists(self.CACHE_FILE):
                 os.remove(self.CACHE_FILE)
             return {}
@@ -346,51 +479,43 @@ class CacheManager:
 class ReportExporter:
     """FR-5.2, FR-5.3: 평가 결과 보고서(Markdown/CSV) 추출 (STR-7 판정 금지 용어 준수)"""
     
-    # FR-5.3 경고 문구 형식
     WARNING_TEMPLATE = "⚠ {source} 데이터의 형식 불일치 또는 부재로 인해 해당 지표가 평가에서 제외되었습니다."
     
     def to_markdown(self, scores: List[MemberScore], missing: Set[str] = None) -> str:
-        """마크다운 테이블 구조(헤더+행) + 결측 소스 blockquote 경고."""
         if missing is None:
             missing = set()
             
-        # 종합 지표 기준 내림차순 정렬
         sorted_scores = sorted(scores, key=lambda x: x.total_score, reverse=True)
         
         lines = []
-        # 테이블 헤더 (판정 금지: "최종 평가" 금지, "종합 지표" 사용)
         lines.append("| 팀원 | 종합 지표 | Git 지표 | 문서 지표 | 메신저 지표 | Capping 적용 | 확인 필요 |")
         lines.append("|---|---|---|---|---|---|---|")
         
         for s in sorted_scores:
             capping = "O" if s.capping_applied else "X"
-            anomaly = ", ".join(s.anomaly_flags) if s.anomaly_flags else ""
+            anomaly = ", ".join(s.signals) if s.signals else ""
             lines.append(f"| {s.author} | {round(s.total_score, 4)} | {round(s.git_score, 4)} | {round(s.doc_score, 4)} | {round(s.msg_score, 4)} | {capping} | {anomaly} |")
         
-        # 결측 소스 경고 (블록쿼트)
         if missing:
-            lines.append("")  # 빈 줄
+            lines.append("")
             for source in sorted(missing):
                 lines.append(f"> {self.WARNING_TEMPLATE.format(source=source)}")
         
         return "\n".join(lines)
     
     def to_csv(self, scores: List[MemberScore], missing: Set[str] = None) -> bytes:
-        """UTF-8 BOM(\xef\xbb\xbf)으로 시작. Excel 한글 호환. bytes 반환."""
         if missing is None:
             missing = set()
         
         output = io.StringIO()
         writer = csv.writer(output)
         
-        # 헤더 (판정 금지 용어 준수)
         writer.writerow([
             '팀원', '종합 지표', 'Git 지표', '문서 지표', '메신저 지표', 
             'Git 변경량(원시)', '문서 글자수(원시)', '메시지 발화(원시)', 
             'Capping 적용', '확인 필요'
         ])
         
-        # 종합 지표 기준 내림차순 정렬
         sorted_scores = sorted(scores, key=lambda x: x.total_score, reverse=True)
         
         for s in sorted_scores:
@@ -401,17 +526,133 @@ class ReportExporter:
                 round(s.doc_score, 4), 
                 round(s.msg_score, 4), 
                 s.raw_additions, 
-                s.raw_char_count, 
-                s.raw_msg_count, 
+                s.raw_chars, 
+                s.raw_messages, 
                 'O' if s.capping_applied else 'X',
-                ", ".join(s.anomaly_flags) if s.anomaly_flags else ""
+                ", ".join(s.signals) if s.signals else ""
             ])
         
-        # 결측 소스 경고
         if missing:
-            writer.writerow([])  # 빈 행
+            writer.writerow([])
             for source in sorted(missing):
                 writer.writerow(["WARNING", self.WARNING_TEMPLATE.format(source=source)])
         
-        # utf-8-sig BOM 인코딩
         return output.getvalue().encode('utf-8-sig')
+
+
+class NormalizedSignalsTracker:
+    """FR-4.2c: 조장이 정상 처리한 이상 신호를 세션 내 예외 상태로 기억"""
+    def __init__(self):
+        self._dismissed: Set[Tuple[str, str, str]] = set()
+        
+    def dismiss(self, author: str, signal_type: str, ref: str = "") -> None:
+        self._dismissed.add((author, signal_type, ref))
+        
+    def restore(self, author: str, signal_type: str, ref: str = "") -> None:
+        self._dismissed.discard((author, signal_type, ref))
+        
+    def is_dismissed(self, author: str, signal_type: str, ref: str = "") -> bool:
+        return (author, signal_type, ref) in self._dismissed
+        
+    def clear(self) -> None:
+        self._dismissed.clear()
+        
+    @staticmethod
+    def ref_of(detail: dict) -> str:
+        t = detail.get("type", "")
+        if t == "CAPPING":
+            return detail.get("hash", "")
+        elif t == "EW-02":
+            return detail.get("period", "")
+        return ""
+        
+    def filter_details(self, author: str, details: List[dict]) -> List[dict]:
+        filtered = []
+        for d in details:
+            t = d.get("type", "")
+            ref = self.ref_of(d)
+            if not self.is_dismissed(author, t, ref):
+                filtered.append(d)
+        return filtered
+        
+    def apply(self, scores: List[MemberScore]) -> List[MemberScore]:
+        result = []
+        for s in scores:
+            new_details = self.filter_details(s.author, s.signal_details)
+            remaining_types = set(d.get("type") for d in new_details)
+            
+            new_signals = []
+            for sig in s.signals:
+                if sig in ("CAPPING", "EW-02", "ZSCORE"):
+                    if sig in remaining_types:
+                        new_signals.append(sig)
+                else:
+                    new_signals.append(sig)
+                    
+            new_score = dataclasses.replace(
+                s, 
+                signal_details=new_details,
+                signals=new_signals
+            )
+            result.append(new_score)
+        return result
+
+
+class AliasExtractor:
+    """FR-1.3: 식별자 수집 및 결정론적 군집화로 N:1 병합 후보 제안"""
+    @staticmethod
+    def normalize_key(alias: str) -> str:
+        local_part = str(alias).split("@")[0]
+        norm = re.sub(r'[\s\._\-]', '', local_part)
+        return norm.lower()
+        
+    def extract_identifiers(self, git: Optional[Dict[str, CommitStats]], docs: Optional[Dict[str, int]], msgs: Optional[Dict[str, int]]) -> List[dict]:
+        identifiers = []
+        
+        if git:
+            for alias, stats in git.items():
+                identifiers.append({"raw_id": alias, "source": "Git", "activity": stats.additions})
+        if docs:
+            for alias, chars in docs.items():
+                identifiers.append({"raw_id": alias, "source": "문서", "activity": chars})
+        if msgs:
+            for alias, count in msgs.items():
+                identifiers.append({"raw_id": alias, "source": "메신저", "activity": count})
+                
+        identifiers.sort(key=lambda x: (x["raw_id"], x["source"]))
+        return identifiers
+        
+    def unique_aliases(self, identifiers: List[dict]) -> List[str]:
+        aliases = set(d["raw_id"] for d in identifiers)
+        aliases.discard("Unknown")
+        aliases.discard("")
+        return sorted(list(aliases))
+        
+    def suggest_groups(self, aliases: List[str]) -> Dict[str, List[str]]:
+        groups = {}
+        for alias in aliases:
+            key = self.normalize_key(alias)
+            if key not in groups:
+                groups[key] = []
+            groups[key].append(alias)
+            
+        def representative_key(a: str) -> tuple:
+            has_korean = bool(re.search(r'[가-힣]', a))
+            return (not has_korean, -len(a), a)
+            
+        result = {}
+        for key, members in groups.items():
+            members.sort(key=representative_key)
+            rep = members[0]
+            result[rep] = sorted(members)
+            
+        return result
+        
+    def suggest_mapping(self, identifiers: List[dict]) -> Dict[str, str]:
+        aliases = self.unique_aliases(identifiers)
+        groups = self.suggest_groups(aliases)
+        mapping = {}
+        for rep, members in groups.items():
+            for m in members:
+                mapping[m] = rep
+        return mapping
