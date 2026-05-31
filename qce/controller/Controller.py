@@ -57,7 +57,14 @@ class AnalysisWorker(QRunnable):
             msg_data = None
             
             if doc_parser:
-                try: doc_data = doc_parser.parse(self.config.get('doc_path', ''))
+                try:
+                    doc_paths = self.config.get('doc_paths') or ([self.config['doc_path']] if self.config.get('doc_path') else [])
+                    doc_data = {}
+                    for dp in doc_paths:
+                        for author, chars in doc_parser.parse(dp).items():
+                            doc_data[author] = doc_data.get(author, 0) + chars
+                    if not doc_data:
+                        doc_data = None
                 except Exception as e: print(f"Doc parsing error (ignored): {e}")
             self.signals.progress.emit(30)
             
@@ -231,10 +238,33 @@ class AppController:
         self.orchestrator.completed.connect(self.on_analysis_completed)
         self.orchestrator.failed.connect(self.on_analysis_failed)
         self.orchestrator.progress.connect(self.on_progress)
-        
-        self.tracker = NormalizedSignalsTracker() if NormalizedSignalsTracker else globals().get('NormalizedSignalsTracker')() if 'NormalizedSignalsTracker' in globals() else None
-        self.alias_extractor = AliasExtractor() if AliasExtractor else globals().get('AliasExtractor')() if 'AliasExtractor' in globals() else None
+
+        self.tracker = NormalizedSignalsTracker() if NormalizedSignalsTracker else None
+        self.alias_extractor = AliasExtractor() if AliasExtractor else None
         self._last_scores = []
+
+        # 입력 상태
+        self._doc_paths: List[str] = []
+        self._git_path: str = ""
+        self._msg_path: str = ""
+        self._weights: Dict[str, float] = {"git": 0.4, "doc": 0.4, "msg": 0.2}
+
+        # SubmitScreen 시그널 연결
+        submit = main_window.submit
+        submit.documents_dropped.connect(self._on_docs_dropped)
+        submit.git_repo_chosen.connect(self._on_git_chosen)
+        submit.messenger_dropped.connect(self._on_msg_dropped)
+        submit.analysis_panel.weights_changed.connect(self._on_weights_changed)
+        submit.analysis_panel.analyze_clicked.connect(self._on_analyze_clicked)
+
+        # ResultScreen 시그널 연결
+        result = main_window.result
+        result.merge_requested.connect(self.on_merge_requested)
+        result.new_analysis_requested.connect(self.on_new_analysis_requested)
+        result.signal_dismissed.connect(self.on_signal_dismissed)
+
+        # 리포트 저장
+        main_window.save_report_requested.connect(self._on_save_report_requested)
 
     def route_event(self, event: str, payload: Any = None) -> None:
         if event == "start_analysis":
@@ -296,3 +326,64 @@ class AppController:
 
     def on_progress(self, val: int) -> None:
         pass
+
+    # ── 입력 캡처 ──────────────────────────────────────────────────────────
+    def _on_docs_dropped(self, paths: List[str]) -> None:
+        self._doc_paths = paths
+
+    def _on_git_chosen(self, path: str) -> None:
+        self._git_path = path
+
+    def _on_msg_dropped(self, path: str) -> None:
+        self._msg_path = path
+
+    # ── 가중치 검증 ────────────────────────────────────────────────────────
+    def _on_weights_changed(self, view_weights: dict) -> None:
+        model_weights = {k[2:]: v for k, v in view_weights.items()}  # w_git→git
+        total = sum(model_weights.values())
+        panel = self.main_window.submit.analysis_panel
+        if abs(total - 1.0) < 1e-4:
+            self._weights = model_weights
+            panel.set_analyze_enabled(True)
+            panel.set_weight_warning(None)
+        else:
+            panel.set_analyze_enabled(False)
+            panel.set_weight_warning(f"가중치 합계가 1.00이어야 합니다 (현재 {total:.2f})")
+
+    def _on_analyze_clicked(self) -> None:
+        config = {
+            "doc_paths": self._doc_paths,
+            "git_path": self._git_path,
+            "msg_path": self._msg_path,
+            "weights": self._weights,
+        }
+        self.main_window.show_loading()
+        self.orchestrator.start_analysis(config)
+
+    # ── 결측 판정 ──────────────────────────────────────────────────────────
+    def _detect_missing(self, scores: list) -> set:
+        if not scores:
+            return set()
+        missing: set = set()
+        if all(s.git_score == 0.0 for s in scores):
+            missing.add("Git")
+        if all(s.doc_score == 0.0 for s in scores):
+            missing.add("문서")
+        if all(s.msg_score == 0.0 for s in scores):
+            missing.add("메신저")
+        return missing
+
+    # ── 리포트 저장 ────────────────────────────────────────────────────────
+    def _do_save(self, path: str, fmt: str) -> None:
+        import os
+        from qce.model.business.report_exporter import ReportExporter
+        if not os.path.splitext(path)[1]:
+            path = f"{path}.{fmt}"
+        missing = self._detect_missing(self._last_scores)
+        ReportExporter().save(path, self._last_scores, missing)
+
+    def _on_save_report_requested(self) -> None:
+        from qce.view.dialogs.save_report_dialog import SaveReportDialog
+        dialog = SaveReportDialog(self.main_window)
+        dialog.path_chosen.connect(self._do_save)
+        dialog.prompt(self.main_window)

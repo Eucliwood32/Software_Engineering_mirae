@@ -371,8 +371,8 @@ class TestCacheManager:
 
     def test_corrupt_cache_recovers(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        with open(".qce_cache", "w") as f:
-            f.write("{not json")
+        import pathlib
+        pathlib.Path(".qce_cache").write_text("{not json")
         cm = CacheManager()
         out = cm.load()
         assert out == {}

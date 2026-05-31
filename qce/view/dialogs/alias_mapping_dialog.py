@@ -109,7 +109,6 @@ class AliasMappingDialog(QDialog):
     # ------------------------------------------------------------------ #
     def _confirm(self) -> None:
         self.mapping_confirmed.emit(self.current_mapping())
-        self.accept()
 
     def _reset_mapping(self) -> None:
         """취소 버튼 클릭 시 다이얼로그를 닫지 않고 선택값을 미지정으로 되돌린다."""

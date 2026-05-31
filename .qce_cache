@@ -1,11 +1,98 @@
 {
   "scores": [
     {
+      "author": "20221985@edu.hanbat.ac.kr",
+      "git_score": 0.6545,
+      "doc_score": 0.0,
+      "msg_score": 0.0,
+      "total_score": 0.4363,
+      "raw_additions": 91,
+      "raw_chars": 0,
+      "raw_messages": 0,
+      "capping_applied": false,
+      "signals": [],
+      "signal_details": [],
+      "commit_dates": [
+        "2026-05-26 23:58:27 +0900",
+        "2026-05-27 20:41:10 +0900",
+        "2026-05-27 20:50:13 +0900",
+        "2026-05-27 20:53:14 +0900",
+        "2026-05-27 20:54:56 +0900",
+        "2026-05-27 20:55:27 +0900",
+        "2026-05-28 18:02:14 +0900"
+      ]
+    },
+    {
+      "author": "20247142@edu.hanbat.ac.kr",
+      "git_score": 1.0,
+      "doc_score": 0.0,
+      "msg_score": 0.0,
+      "total_score": 0.6667,
+      "raw_additions": 6019,
+      "raw_chars": 0,
+      "raw_messages": 0,
+      "capping_applied": true,
+      "signals": [
+        "CAPPING"
+      ],
+      "signal_details": [
+        {
+          "hash": "1f8ab11",
+          "date": "2026-05-30 07:03:51 +0900",
+          "additions": 1926,
+          "type": "CAPPING"
+        },
+        {
+          "hash": "64afb23",
+          "date": "2026-05-29 01:08:07 +0900",
+          "additions": 1336,
+          "type": "CAPPING"
+        }
+      ],
+      "commit_dates": [
+        "2026-05-27 02:15:18 +0900",
+        "2026-05-27 20:50:28 +0900",
+        "2026-05-27 21:22:48 +0900",
+        "2026-05-27 21:47:03 +0900",
+        "2026-05-27 21:55:51 +0900",
+        "2026-05-27 22:01:31 +0900",
+        "2026-05-28 02:56:10 +0900",
+        "2026-05-28 04:12:34 +0900",
+        "2026-05-28 17:32:42 +0900",
+        "2026-05-28 18:13:34 +0900",
+        "2026-05-28 18:40:05 +0900",
+        "2026-05-29 01:08:07 +0900",
+        "2026-05-29 22:05:31 +0900",
+        "2026-05-29 23:42:18 +0900",
+        "2026-05-30 07:03:51 +0900",
+        "2026-05-31 00:54:49 +0900",
+        "2026-05-31 01:15:41 +0900",
+        "2026-05-31 01:31:53 +0900"
+      ]
+    },
+    {
+      "author": "96867796+Eucliwood32@users.noreply.github.com",
+      "git_score": 0.4407,
+      "doc_score": 0.0,
+      "msg_score": 0.0,
+      "total_score": 0.2938,
+      "raw_additions": 20,
+      "raw_chars": 0,
+      "raw_messages": 0,
+      "capping_applied": false,
+      "signals": [],
+      "signal_details": [],
+      "commit_dates": [
+        "2026-05-26 10:21:53 +0900",
+        "2026-05-26 11:14:17 +0900"
+      ]
+    },
+    {
       "author": "Alice",
       "git_score": 0.0,
       "doc_score": 0.0,
       "msg_score": 1.0,
-      "total_score": 1.0,
+      "total_score": 0.3333,
       "raw_additions": 0,
       "raw_chars": 0,
       "raw_messages": 1,
@@ -18,11 +105,11 @@
       "author": "Bob",
       "git_score": 0.0,
       "doc_score": 0.0,
-      "msg_score": 0.0,
-      "total_score": 0.0,
+      "msg_score": 1.0,
+      "total_score": 0.3333,
       "raw_additions": 0,
       "raw_chars": 0,
-      "raw_messages": 0,
+      "raw_messages": 1,
       "capping_applied": false,
       "signals": [],
       "signal_details": [],
@@ -32,15 +119,114 @@
       "author": "Charlie",
       "git_score": 0.0,
       "doc_score": 0.0,
-      "msg_score": 0.0,
-      "total_score": 0.0,
+      "msg_score": 1.0,
+      "total_score": 0.3333,
       "raw_additions": 0,
       "raw_chars": 0,
-      "raw_messages": 0,
+      "raw_messages": 1,
       "capping_applied": false,
       "signals": [],
       "signal_details": [],
       "commit_dates": []
+    },
+    {
+      "author": "gnlwnd40@gmail.com",
+      "git_score": 1.0,
+      "doc_score": 0.0,
+      "msg_score": 0.0,
+      "total_score": 0.6667,
+      "raw_additions": 4195,
+      "raw_chars": 0,
+      "raw_messages": 0,
+      "capping_applied": true,
+      "signals": [],
+      "signal_details": [],
+      "commit_dates": [
+        "2026-05-27 02:02:09 +0900",
+        "2026-05-28 01:49:37 +0900",
+        "2026-05-28 02:10:11 +0900",
+        "2026-05-29 22:03:41 +0900",
+        "2026-05-30 00:11:09 +0900",
+        "2026-05-30 01:03:06 +0900",
+        "2026-05-30 01:12:39 +0900",
+        "2026-05-31 01:06:50 +0900",
+        "2026-05-31 01:50:19 +0900",
+        "2026-05-31 02:05:25 +0900",
+        "2026-05-31 02:24:11 +0900",
+        "2026-06-01 02:06:27 +0900",
+        "2026-06-01 02:40:59 +0900",
+        "2026-06-01 02:54:23 +0900",
+        "2026-06-01 03:38:01 +0900"
+      ]
+    },
+    {
+      "author": "wonhui32@gmail.com",
+      "git_score": 1.0,
+      "doc_score": 0.0,
+      "msg_score": 0.0,
+      "total_score": 0.6667,
+      "raw_additions": 146823,
+      "raw_chars": 0,
+      "raw_messages": 0,
+      "capping_applied": true,
+      "signals": [
+        "CAPPING"
+      ],
+      "signal_details": [
+        {
+          "hash": "8c4d8ea",
+          "date": "2026-05-31 15:19:20 +0900",
+          "additions": 1442,
+          "type": "CAPPING"
+        },
+        {
+          "hash": "ff6e21f",
+          "date": "2026-05-31 07:03:47 +0900",
+          "additions": 1835,
+          "type": "CAPPING"
+        },
+        {
+          "hash": "dbfefdd",
+          "date": "2026-05-29 01:56:31 +0900",
+          "additions": 116839,
+          "type": "CAPPING"
+        },
+        {
+          "hash": "4b9b34c",
+          "date": "2026-05-28 02:48:17 +0900",
+          "additions": 22663,
+          "type": "CAPPING"
+        },
+        {
+          "hash": "97a5ead",
+          "date": "2026-05-27 19:56:48 +0900",
+          "additions": 1346,
+          "type": "CAPPING"
+        }
+      ],
+      "commit_dates": [
+        "2026-05-27 02:14:39 +0900",
+        "2026-05-27 03:01:28 +0900",
+        "2026-05-27 03:09:22 +0900",
+        "2026-05-27 19:56:48 +0900",
+        "2026-05-27 21:32:10 +0900",
+        "2026-05-28 02:48:17 +0900",
+        "2026-05-28 02:53:22 +0900",
+        "2026-05-28 03:02:49 +0900",
+        "2026-05-29 01:56:31 +0900",
+        "2026-05-29 01:59:05 +0900",
+        "2026-05-29 02:07:07 +0900",
+        "2026-05-29 02:14:48 +0900",
+        "2026-05-30 18:07:21 +0900",
+        "2026-05-31 07:03:47 +0900",
+        "2026-05-31 13:51:33 +0900",
+        "2026-05-31 15:19:20 +0900",
+        "2026-05-31 21:14:15 +0900",
+        "2026-05-31 22:08:13 +0900",
+        "2026-06-01 02:42:17 +0900",
+        "2026-06-01 03:42:11 +0900"
+      ]
     }
-  ]
+  ],
+  "timestamp": "now"
 }

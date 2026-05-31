@@ -9,14 +9,13 @@ QCE(Quantitative Contribution Evaluator) 시스템의 Model · BusinessLogic 레
 """
 
 import math
-import json
-import os
-import io
-import csv
 import re
 import dataclasses
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set, Tuple, Union
+
+from qce.model.business.cache_manager import CacheManager  # noqa: F401 (re-export)
+from qce.model.business.report_exporter import ReportExporter  # noqa: F401 (re-export)
 
 # ==========================================
 # 1. 공용 데이터 타입 (Architecture Overview §5.1)
@@ -88,7 +87,7 @@ class CappingScaler:
     def log_scale(self, total: int) -> float:
         if total == 0:
             return 0.0
-        return round(math.log1p(total), 4)
+        return math.log1p(total)
 
 
 class AnomalySignalDetector:
@@ -166,9 +165,9 @@ class AnomalySignalDetector:
         details = []
         for i, score in enumerate(scores):
             metrics = []
-            if git_z and git_z[i] <= -1.5: metrics.append("Git")
-            if doc_z and doc_z[i] <= -1.5: metrics.append("문서")
-            if msg_z and msg_z[i] <= -1.5: metrics.append("메신저")
+            if git_z and git_z[i] <= -1.5: metrics.append("git")
+            if doc_z and doc_z[i] <= -1.5: metrics.append("doc")
+            if msg_z and msg_z[i] <= -1.5: metrics.append("msg")
             
             if len(metrics) >= 2:
                 details.append({
@@ -262,6 +261,8 @@ class WeightPresetManager:
         return result
 
     def redistribute(self, changed_key: str, new_value: float, current: Dict[str, float]) -> Dict[str, float]:
+        if changed_key not in {"git", "doc", "msg"}:
+            raise ValueError(f"Unknown weight key: {changed_key!r}")
         fixed_val = self.clamp(new_value)
         result = {changed_key: fixed_val}
         
@@ -364,7 +365,10 @@ class ContributionAggregator:
             available.add("doc")
         if msgs is not None:
             available.add("msg")
-            
+
+        if not available:
+            return []
+
         # 2. 가중치 재조정 (결측 소스 처리)
         rebalanced = self.weight_rebalancer.rebalance(weights, available)
         
@@ -447,99 +451,6 @@ class ContributionAggregator:
         return scores
 
 
-class CacheManager:
-    """NFR-2.3, NFR-2.4, C-8: 원자적 JSON 캐싱 시스템"""
-    CACHE_FILE = ".qce_cache"
-    TMP_FILE = ".qce_cache.tmp"
-
-    def save(self, data: dict) -> None:
-        try:
-            with open(self.TMP_FILE, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-                f.flush()
-                os.fsync(f.fileno())
-            os.replace(self.TMP_FILE, self.CACHE_FILE)
-        except Exception as e:
-            if os.path.exists(self.TMP_FILE):
-                os.remove(self.TMP_FILE)
-            raise e
-            
-    def load(self) -> dict:
-        if not os.path.exists(self.CACHE_FILE):
-            return {}
-        try:
-            with open(self.CACHE_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except (json.JSONDecodeError, KeyError, UnicodeDecodeError):
-            if os.path.exists(self.CACHE_FILE):
-                os.remove(self.CACHE_FILE)
-            return {}
-
-
-class ReportExporter:
-    """FR-5.2, FR-5.3: 평가 결과 보고서(Markdown/CSV) 추출 (STR-7 판정 금지 용어 준수)"""
-    
-    WARNING_TEMPLATE = "⚠ {source} 데이터의 형식 불일치 또는 부재로 인해 해당 지표가 평가에서 제외되었습니다."
-    
-    def to_markdown(self, scores: List[MemberScore], missing: Set[str] = None) -> str:
-        if missing is None:
-            missing = set()
-            
-        sorted_scores = sorted(scores, key=lambda x: x.total_score, reverse=True)
-        
-        lines = []
-        lines.append("| 팀원 | 종합 지표 | Git 지표 | 문서 지표 | 메신저 지표 | Capping 적용 | 확인 필요 |")
-        lines.append("|---|---|---|---|---|---|---|")
-        
-        for s in sorted_scores:
-            capping = "O" if s.capping_applied else "X"
-            anomaly = ", ".join(s.signals) if s.signals else ""
-            lines.append(f"| {s.author} | {round(s.total_score, 4)} | {round(s.git_score, 4)} | {round(s.doc_score, 4)} | {round(s.msg_score, 4)} | {capping} | {anomaly} |")
-        
-        if missing:
-            lines.append("")
-            for source in sorted(missing):
-                lines.append(f"> {self.WARNING_TEMPLATE.format(source=source)}")
-        
-        return "\n".join(lines)
-    
-    def to_csv(self, scores: List[MemberScore], missing: Set[str] = None) -> bytes:
-        if missing is None:
-            missing = set()
-        
-        output = io.StringIO()
-        writer = csv.writer(output)
-        
-        writer.writerow([
-            '팀원', '종합 지표', 'Git 지표', '문서 지표', '메신저 지표', 
-            'Git 변경량(원시)', '문서 글자수(원시)', '메시지 발화(원시)', 
-            'Capping 적용', '확인 필요'
-        ])
-        
-        sorted_scores = sorted(scores, key=lambda x: x.total_score, reverse=True)
-        
-        for s in sorted_scores:
-            writer.writerow([
-                s.author, 
-                round(s.total_score, 4), 
-                round(s.git_score, 4), 
-                round(s.doc_score, 4), 
-                round(s.msg_score, 4), 
-                s.raw_additions, 
-                s.raw_chars, 
-                s.raw_messages, 
-                'O' if s.capping_applied else 'X',
-                ", ".join(s.signals) if s.signals else ""
-            ])
-        
-        if missing:
-            writer.writerow([])
-            for source in sorted(missing):
-                writer.writerow(["WARNING", self.WARNING_TEMPLATE.format(source=source)])
-        
-        return output.getvalue().encode('utf-8-sig')
-
-
 class NormalizedSignalsTracker:
     """FR-4.2c: 조장이 정상 처리한 이상 신호를 세션 내 예외 상태로 기억"""
     def __init__(self):
@@ -556,14 +467,17 @@ class NormalizedSignalsTracker:
         
     def clear(self) -> None:
         self._dismissed.clear()
-        
+
+    def dismissed_count(self) -> int:
+        return len(self._dismissed)
+
     @staticmethod
     def ref_of(detail: dict) -> str:
         t = detail.get("type", "")
         if t == "CAPPING":
             return detail.get("hash", "")
         elif t == "EW-02":
-            return detail.get("period", "")
+            return detail.get("period") or detail.get("date", "")
         return ""
         
     def filter_details(self, author: str, details: List[dict]) -> List[dict]:
@@ -611,13 +525,13 @@ class AliasExtractor:
         
         if git:
             for alias, stats in git.items():
-                identifiers.append({"raw_id": alias, "source": "Git", "activity": stats.additions})
+                identifiers.append({"raw_id": alias, "source": "git", "activity": stats.additions})
         if docs:
             for alias, chars in docs.items():
-                identifiers.append({"raw_id": alias, "source": "문서", "activity": chars})
+                identifiers.append({"raw_id": alias, "source": "doc", "activity": chars})
         if msgs:
             for alias, count in msgs.items():
-                identifiers.append({"raw_id": alias, "source": "메신저", "activity": count})
+                identifiers.append({"raw_id": alias, "source": "msg", "activity": count})
                 
         identifiers.sort(key=lambda x: (x["raw_id"], x["source"]))
         return identifiers
@@ -629,6 +543,7 @@ class AliasExtractor:
         return sorted(list(aliases))
         
     def suggest_groups(self, aliases: List[str]) -> Dict[str, List[str]]:
+        aliases = [a for a in aliases if a not in ("Unknown", "")]
         groups = {}
         for alias in aliases:
             key = self.normalize_key(alias)

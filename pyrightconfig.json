@@ -1,3 +1,4 @@
 {
-  "extraPaths": [".", ".venv/Lib/site-packages"]
+  "pythonVersion": "3.12",
+  "extraPaths": ["."]
 }
