@@ -32,8 +32,32 @@ class AnomalySignalDetector:
                     })
         return signals
 
+    def detect_capping(self, repo: dict[str, CommitStats]) -> list[dict]:
+        """FR-4.2: 단일 커밋 변경 라인 > 1000 인 커밋을 신호로 반환.
+        반환: [{author, hash, date, additions}, ...] (해시는 7자 축약).
+        """
+        signals = []
+        for author, stats in repo.items():
+            for commit in stats.commits_list or []:
+                adds = int(commit.get("additions", 0))
+                if adds > 1000:
+                    raw_hash = str(commit.get("hash", ""))
+                    signals.append({
+                        "author": author,
+                        "hash": raw_hash[:7],
+                        "date": commit.get("date", ""),
+                        "additions": adds,
+                    })
+        return signals
+
     def detect_zscore(self, scores: list[MemberScore]) -> list[str]:
         """FR-4.2c: Z-Score ≤ -1.5 인 지표가 2개 이상인 팀원 이름 목록."""
+        return [d["author"] for d in self.detect_zscore_detail(scores)]
+
+    def detect_zscore_detail(self, scores: list[MemberScore]) -> list[dict]:
+        """detect_zscore의 상세판: 어떤 지표가 하위 이상치인지 함께 반환.
+        반환: [{author, metrics: ["git","doc",...]}, ...]
+        """
         if not scores:
             return []
 
@@ -48,8 +72,40 @@ class AnomalySignalDetector:
         dz = _z([s.doc_score for s in scores])
         mz = _z([s.msg_score for s in scores])
 
-        return [
-            scores[i].author
-            for i in range(len(scores))
-            if sum([gz[i] <= -1.5, dz[i] <= -1.5, mz[i] <= -1.5]) >= 2
-        ]
+        out = []
+        for i in range(len(scores)):
+            low = [
+                name
+                for name, z in (("git", gz[i]), ("doc", dz[i]), ("msg", mz[i]))
+                if z <= -1.5
+            ]
+            if len(low) >= 2:
+                out.append({"author": scores[i].author, "metrics": low})
+        return out
+
+    def build_signal_details(
+        self, repo: dict[str, CommitStats] | None, scores: list[MemberScore]
+    ) -> dict[str, list[dict]]:
+        """팀원별 구조화 신호 상세 묶음 {author: [detail, ...]} 생성(카드 표시용).
+        detail 공통키: type(CAPPING|EW-02|ZSCORE) + 유형별 메타. STR-7: 점수 미반영.
+        """
+        by_author: dict[str, list[dict]] = {s.author: [] for s in scores}
+
+        if repo is not None:
+            for cap in self.detect_capping(repo):
+                by_author.setdefault(cap["author"], []).append({
+                    "type": "CAPPING", **{k: cap[k] for k in ("hash", "date", "additions")},
+                })
+            for freq in self.detect_frequency(repo):
+                by_author.setdefault(freq["author"], []).append({
+                    "type": "EW-02",
+                    "date": freq["period"],
+                    "period_commits": freq["period_commits"],
+                    "baseline_avg": freq["baseline_avg"],
+                })
+
+        for z in self.detect_zscore_detail(scores):
+            by_author.setdefault(z["author"], []).append({
+                "type": "ZSCORE", "metrics": z["metrics"],
+            })
+        return by_author

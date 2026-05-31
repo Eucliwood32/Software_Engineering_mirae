@@ -20,6 +20,8 @@ K_RAW_CHAR = "raw_chars"
 K_RAW_MSG = "raw_messages"
 K_CAPPING = "capping_applied"
 K_ANOMALY = "signals"
+K_SIGNAL_DETAILS = "signal_details"      # FR-4.2 카드용 구조화 상세 목록
+K_COMMIT_DATES = "commit_dates"          # 커밋 일자(YYYY-MM-DD) 목록 — 타임라인/드릴다운
 
 # --- 식별자 dict 키 (AliasMappingDialog.populate 의 원소, FR-1.3) ---
 K_RAW_ID = "raw_id"
@@ -44,6 +46,8 @@ SCORE_KEYS: frozenset[str] = frozenset(
         K_RAW_MSG,
         K_CAPPING,
         K_ANOMALY,
+        K_SIGNAL_DETAILS,
+        K_COMMIT_DATES,
     }
 )
 

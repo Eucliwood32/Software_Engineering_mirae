@@ -2,6 +2,8 @@
 from __future__ import annotations
 import dataclasses
 from qce.controller.analysis_orchestrator import AnalysisOrchestrator
+from qce.model.business.alias_extractor import AliasExtractor
+from qce.model.business.normalized_signals_tracker import NormalizedSignalsTracker
 from qce.model.business.report_exporter import ReportExporter
 from qce.model.business.weight_preset_manager import WeightPresetManager
 
@@ -19,6 +21,8 @@ class AppController:
         self._msg_path: str = ""
         self._weights: dict = {"git": 0.4, "doc": 0.4, "msg": 0.2}
         self._preset_mgr = WeightPresetManager()
+        self._alias_extractor = AliasExtractor()
+        self._signals_tracker = NormalizedSignalsTracker()
 
         # Orchestrator → Controller
         orchestrator.completed.connect(self.on_analysis_completed)
@@ -40,6 +44,7 @@ class AppController:
         r = main_window.result
         r.merge_requested.connect(self._on_merge)
         r.new_analysis_requested.connect(main_window.show_submit)
+        r.signal_dismissed.connect(self._on_signal_dismissed)
 
         # MainWindow → Controller
         main_window.save_report_requested.connect(self._on_save_report)
@@ -96,10 +101,37 @@ class AppController:
 
     def on_analysis_completed(self, scores: list) -> None:
         self._last_scores = scores
-        score_dicts = [dataclasses.asdict(s) for s in scores]
+        self._signals_tracker.clear()              # 새 결과 → 신호 예외 초기화
         self._missing = self._detect_missing(scores)
-        self.main_window.result.render(score_dicts, self._missing)
+        self._render_results()
         self.main_window.show_result()
+
+    def _render_results(self) -> None:
+        """현재 신호 예외(tracker)를 반영해 결과 화면을 렌더(재집계 없음)."""
+        filtered = self._signals_tracker.apply(self._last_scores)
+        score_dicts = [dataclasses.asdict(s) for s in filtered]
+        self.main_window.result.render(score_dicts, self._missing)
+        self.main_window.result.set_suggested_mapping(
+            self._suggest_alias_mapping(self._last_scores)
+        )
+
+    def _on_signal_dismissed(self, author: str, signal_type: str, ref: str) -> None:
+        """FR-4.2c: '정상으로 표시'된 신호를 예외 등록하고 재렌더."""
+        self._signals_tracker.dismiss(author, signal_type, ref)
+        self._render_results()
+
+    def _suggest_alias_mapping(self, scores: list) -> dict[str, str]:
+        """결과 인물(author) 중 별칭으로 의심되는 군집을 추천 매핑으로 변환(FR-1.3).
+        대표명이 자기 자신과 다른 항목만(=실제 군집) 남긴다."""
+        authors = [s.author for s in scores]
+        groups = self._alias_extractor.suggest_groups(authors)
+        mapping: dict[str, str] = {}
+        for rep, members in groups.items():
+            if len(members) < 2:
+                continue
+            for alias in members:
+                mapping[alias] = rep
+        return mapping
 
     def on_analysis_failed(self, _message: str) -> None:
         self.main_window.show_submit()

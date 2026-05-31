@@ -81,6 +81,19 @@ class AliasMappingDialog(QDialog):
             self._row_labels[raw_id] = label
             self._update_row_style(raw_id)
 
+    def apply_suggested(self, suggested: dict[str, str]) -> None:
+        """Controller가 계산한 추천 매핑({raw_id: 대표명})으로 드롭다운을 미리 선택.
+
+        FR-1.3: 자동 병합을 강제하지 않으므로, 대표명이 raw_id 자신과 다르고
+        실제 팀원 목록에 존재할 때만(=명확한 별칭 군집) 미리 채운다. 단일 식별자는
+        (미지정) 상태로 둔다.
+        """
+        for raw_id, member in suggested.items():
+            combo = self._combos.get(raw_id)
+            if combo is None or member == raw_id or member not in self._members:
+                continue
+            combo.setCurrentText(member)
+
     def current_mapping(self) -> dict[str, str]:
         """드롭다운에서 팀원이 선택된 식별자만 {raw_id: member}로 반환."""
         return {

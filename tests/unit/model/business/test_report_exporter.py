@@ -56,3 +56,50 @@ def test_save_csv_roundtrip(tmp_path):
     raw = (tmp_path / "report.csv").read_bytes()
     assert raw.startswith(b"\xef\xbb\xbf")
     assert "WARNING" in raw.decode("utf-8-sig")
+
+
+# ── HTML 포맷 (확장) ─────────────────────────────────────────────────────
+
+def test_html_is_self_contained_no_external_resources():
+    out = ReportExporter().to_html(_scores())
+    assert out.startswith("<!DOCTYPE html>")
+    assert "<table>" in out
+    assert "종합 지표" in out
+    # O-4: 외부 리소스(CDN/웹폰트/http) 미참조
+    assert "http://" not in out and "https://" not in out
+
+
+def test_html_escapes_author():
+    scores = [MemberScore("<script>", 0.1, 0.1, 0.1, 0.1, 0, 0, 0, False, [])]
+    out = ReportExporter().to_html(scores)
+    assert "<script>" not in out
+    assert "&lt;script&gt;" in out
+
+
+def test_html_missing_warning():
+    out = ReportExporter().to_html(_scores(), missing={"메신저"})
+    assert "warn" in out
+    assert "메신저" in out
+
+
+# ── JSON 포맷 (확장) ─────────────────────────────────────────────────────
+
+def test_json_structure_and_sorting():
+    import json
+    out = json.loads(ReportExporter().to_json(_scores(), missing={"Git"}))
+    assert [m["author"] for m in out["members"]] == ["Alice", "Bob"]   # total desc
+    assert out["missing"] == ["Git"]
+    assert out["members"][1]["signals"] == ["CAPPING"]
+    assert out["warnings"] and "Git" in out["warnings"][0]
+
+
+def test_save_html_and_json_roundtrip(tmp_path):
+    exp = ReportExporter()
+    hp = str(tmp_path / "r.html")
+    jp = str(tmp_path / "r.json")
+    exp.save(hp, _scores())
+    exp.save(jp, _scores())
+    assert (tmp_path / "r.html").read_text(encoding="utf-8").startswith("<!DOCTYPE html>")
+    import json
+    data = json.loads((tmp_path / "r.json").read_text(encoding="utf-8"))
+    assert "members" in data

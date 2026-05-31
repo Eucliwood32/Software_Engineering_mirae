@@ -10,7 +10,12 @@
       "raw_chars": 100,
       "raw_messages": 2,
       "capping_applied": false,
-      "signals": []
+      "signals": [],
+      "signal_details": [],
+      "commit_dates": [
+        "2024-01-01",
+        "2000-01-01"
+      ]
     }
   ]
 }

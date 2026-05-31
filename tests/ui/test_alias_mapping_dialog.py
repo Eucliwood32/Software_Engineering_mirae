@@ -1,7 +1,7 @@
 """FR-1.3 — AliasMappingDialog UI (L3)."""
 from __future__ import annotations
 
-from qce.view.dialogs.alias_mapping_dialog import AliasMappingDialog
+from qce.view.dialogs.alias_mapping_dialog import PLACEHOLDER, AliasMappingDialog
 
 
 def _identifiers():
@@ -45,6 +45,29 @@ def test_unmapped_excluded(qtbot):                              # TC-FR-1.3-02/0
     # ghost는 미선택 → 매핑 제외, 미매핑 목록에 포함
     assert "ghost" not in dlg.current_mapping()
     assert "ghost" in dlg.unmapped_ids()
+
+
+def test_apply_suggested_preselects_clustered_alias(qtbot):    # FR-1.3 자동 추천
+    dlg = AliasMappingDialog()
+    qtbot.addWidget(dlg)
+    dlg.set_members(["이대한", "조원희"])
+    dlg.populate(_identifiers())
+    # 대표명 "이대한"으로 별칭 군집을 추천 → 해당 행만 미리 선택됨
+    dlg.apply_suggested({"dh-lee": "이대한", "daehan.lee": "이대한", "이대한": "이대한"})
+    assert dlg.combo_for("dh-lee").currentText() == "이대한"
+    assert dlg.combo_for("daehan.lee").currentText() == "이대한"
+    # 대표명==raw_id(자기 자신)인 행은 강제 선택하지 않는다 → (미지정) 유지.
+    assert dlg.combo_for("이대한").currentText() == PLACEHOLDER
+
+
+def test_apply_suggested_ignores_unknown_member(qtbot):
+    dlg = AliasMappingDialog()
+    qtbot.addWidget(dlg)
+    dlg.set_members(["조원희"])
+    dlg.populate(_identifiers())
+    # 추천 대표명이 멤버 목록에 없으면 무시(미지정 유지)
+    dlg.apply_suggested({"dh-lee": "이대한"})
+    assert "dh-lee" not in dlg.current_mapping()
 
 
 def test_mapping_confirmed_signal(qtbot):

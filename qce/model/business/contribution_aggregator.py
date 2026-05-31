@@ -116,4 +116,20 @@ class ContributionAggregator:
             if s.author in freq_flagged:
                 s.signals.append("EW-02")
 
+        # 8b. 신호 카드용 구조화 상세(작성자·해시·작성일·변경라인). FR-4.2/4.2b/4.2d.
+        details = self.anomaly_detector.build_signal_details(git, scores)
+        for s in scores:
+            s.signal_details = details.get(s.author, [])
+
+        # 8c. 커밋 일자(타임라인·드릴다운용). git 없으면 빈 목록.
+        if git is not None:
+            for s in scores:
+                stats = git.get(s.author)
+                if stats is not None:
+                    s.commit_dates = [
+                        str(c.get("date", ""))[:10]
+                        for c in stats.commits_list
+                        if c.get("date")
+                    ]
+
         return scores

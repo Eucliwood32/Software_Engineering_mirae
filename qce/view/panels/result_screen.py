@@ -25,6 +25,7 @@ from qce.view.panels.warning_banner import WarningBanner
 class ResultScreen(QWidget):
     merge_requested = pyqtSignal(dict)            # {alias→member} 병합 그룹
     new_analysis_requested = pyqtSignal()
+    signal_dismissed = pyqtSignal(str, str, str)  # (author, type, ref) — FR-4.2c 중계
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -33,6 +34,8 @@ class ResultScreen(QWidget):
         self.merge = AliasMappingDialog()         # 결과 화면 임베드(FR-5.7)
         # 병합 확정 → merge_requested로 중계 (재집계는 Controller 책임)
         self.merge.mapping_confirmed.connect(self.merge_requested)
+        # 신호 예외 처리(FR-4.2c) → Controller로 중계
+        self.dashboard.signal_dismissed.connect(self.signal_dismissed)
 
         root = QVBoxLayout(self)
         root.addWidget(self.banner)
@@ -51,6 +54,10 @@ class ResultScreen(QWidget):
         self.dashboard.render(scores, missing)
         self.banner.show_missing(missing)
         self.populate_merge(scores)
+
+    def set_suggested_mapping(self, suggested: dict[str, str]) -> None:
+        """Controller가 계산한 추천 별칭 매핑을 병합 컨트롤에 미리 채운다(FR-1.3)."""
+        self.merge.apply_suggested(suggested)
 
     def populate_merge(self, scores: list[dict]) -> None:
         """결과 인물(author)을 병합 컨트롤 후보로 채운다. 후보=대표 지정 대상 팀원."""

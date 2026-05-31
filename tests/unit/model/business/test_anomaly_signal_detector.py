@@ -58,3 +58,53 @@ def test_zscore_flags_low_outlier():
 
 def test_zscore_empty():
     assert AnomalySignalDetector().detect_zscore([]) == []
+
+
+# ── FR-4.2 detect_capping ────────────────────────────────────────────────
+
+def test_capping_flags_large_commit():
+    repo = {
+        "x@t.com": CommitStats(
+            2, 0, 0,
+            [
+                {"hash": "abc1234567", "date": "2024-01-01", "additions": 2500},
+                {"hash": "def7654321", "date": "2024-01-02", "additions": 10},
+            ],
+        )
+    }
+    caps = AnomalySignalDetector().detect_capping(repo)
+    assert len(caps) == 1
+    assert caps[0]["author"] == "x@t.com"
+    assert caps[0]["hash"] == "abc1234"          # 7자 축약
+    assert caps[0]["additions"] == 2500
+
+
+def test_capping_none_under_threshold():
+    repo = {"y@t.com": CommitStats(1, 0, 0, [{"hash": "h", "date": "d", "additions": 1000}])}
+    assert AnomalySignalDetector().detect_capping(repo) == []
+
+
+# ── 구조화 상세 (카드용) ───────────────────────────────────────────────
+
+def test_zscore_detail_reports_metrics():
+    scores = [
+        MemberScore("High1", 0.9, 0.9, 0.9, 0.9, 0, 0, 0, False, []),
+        MemberScore("High2", 0.85, 0.85, 0.85, 0.85, 0, 0, 0, False, []),
+        MemberScore("High3", 0.88, 0.88, 0.88, 0.88, 0, 0, 0, False, []),
+        MemberScore("Low", 0.0, 0.0, 0.85, 0.3, 0, 0, 0, False, []),
+    ]
+    detail = AnomalySignalDetector().detect_zscore_detail(scores)
+    low = next(d for d in detail if d["author"] == "Low")
+    assert set(low["metrics"]) == {"git", "doc"}
+
+
+def test_build_signal_details_groups_by_author():
+    repo = {
+        "x@t.com": CommitStats(
+            1, 0, 0, [{"hash": "cap1abcd", "date": "2024-01-01", "additions": 5000}]
+        )
+    }
+    scores = [MemberScore("x@t.com", 0.5, 0.5, 0.5, 0.5, 5000, 0, 0, True, [])]
+    by_author = AnomalySignalDetector().build_signal_details(repo, scores)
+    types = {d["type"] for d in by_author["x@t.com"]}
+    assert "CAPPING" in types
