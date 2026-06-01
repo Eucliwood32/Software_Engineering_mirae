@@ -58,6 +58,19 @@ class ScatterChartWidget(BaseChartWidget):
     member_selected = pyqtSignal(str)
     DOT_SIZE = 80.0
 
+    def hasHeightForWidth(self) -> bool:
+        return True
+
+    def heightForWidth(self, width: int) -> int:
+        return int(width * 2 / 3)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        target_h = int(self.width() * 2 / 3)
+        if self.minimumHeight() != target_h:
+            self.setMinimumHeight(target_h)
+            self.setMaximumHeight(target_h)
+
     def _render_static(self) -> None:
         self.ax.clear()
         self._style_axes(self.ax)
@@ -101,6 +114,7 @@ class ScatterChartWidget(BaseChartWidget):
         x_key = self._available_keys[1]
         self.ax.set_ylabel(f"{_SRC_LABELS[y_key][0]} 점수")
         self.ax.set_xlabel(f"{_SRC_LABELS[x_key][0]} 점수")
+        self.ax.grid(True, color=T.COLOR_GRID, linestyle='-', linewidth=0.5, zorder=0)
 
         x_vals = [float(m[x_key]) for m in self._scores]
         y_vals = [float(m[y_key]) for m in self._scores]
@@ -133,10 +147,16 @@ class ScatterChartWidget(BaseChartWidget):
                     1.0
                 )
             
+            from mpl_toolkits.axes_grid1 import make_axes_locatable
             cmap = LinearSegmentedColormap.from_list("gradient_cmap", [c_min, c_max])
             sm = ScalarMappable(cmap=cmap)
             sm.set_array([])
-            self._cbar = self.figure.colorbar(sm, ax=self.ax)
+            
+            divider = make_axes_locatable(self.ax)
+            cax = divider.append_axes("right", size="5%", pad=0.1)
+            cax.set_box_aspect(10)
+            
+            self._cbar = self.figure.colorbar(sm, cax=cax)
             self._cbar.set_label(f"{_SRC_LABELS[s_key][0]} 점수")
             self._cbar.ax.yaxis.label.set_color(T.COLOR_TEXT)
             self._cbar.ax.tick_params(colors=T.COLOR_TEXT)
@@ -158,7 +178,7 @@ class ScatterChartWidget(BaseChartWidget):
             x_vals, y_vals, s=[self.DOT_SIZE] * len(self._scores), 
             facecolors=[(0, 0, 0, 0)] * len(self._scores), 
             edgecolors=[(0, 0, 0, 0)] * len(self._scores), 
-            zorder=3, picker=True
+            zorder=10, picker=True, clip_on=False
         )
 
         self._resolve_label_overlap(x_vals, y_vals)

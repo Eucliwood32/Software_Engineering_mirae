@@ -30,7 +30,7 @@ from qce.view.style import tokens as T
 DOC_EXTS = {".pptx", ".docx", ".hwpx"}
 MSG_EXTS = {".txt"}
 
-_LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "logo.png")
+_LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "QCE_Logo.png")
 _DESCRIPTION = "Git · 문서 · 메신저 기여를 한 번에 정량 분석합니다.\n과제물(또는 폴더)을 아래 영역에 끌어다 놓으세요."
 _DROP_HINT = (
     "여기에 문서(.pptx/.docx/.hwpx)·카카오톡(.txt)·폴더·Git 저장소를 끌어다 놓으세요\n"
@@ -61,16 +61,22 @@ class SubmitScreen(QWidget):
         )
         root.setSpacing(T.SPACING_XL)
 
-        # 로고 (assets/logo.png, 없으면 텍스트 폴백) — 캔버스 위 헤드라인
+        # 로고 (assets/QCE_Logo.png, 없으면 텍스트 폴백) — 캔버스 위 헤드라인
         logo = QLabel()
         logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         pix = QPixmap(_LOGO_PATH)
         if not pix.isNull():
-            logo.setPixmap(pix.scaledToHeight(48, Qt.TransformationMode.SmoothTransformation))
+            logo.setPixmap(pix.scaledToHeight(120, Qt.TransformationMode.SmoothTransformation))
         else:
-            logo.setText("QCE — 부탁해 꼬마선장")
+            logo.setText("QCE")
             logo.setObjectName("logoText")
         root.addWidget(logo)
+
+        # 서브타이틀
+        subtitle = QLabel("QCE - 부탁해 꼬마선장")
+        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        subtitle.setStyleSheet(f"font-size: {T.FONT_SUBTITLE}px; font-weight: 600; color: {T.COLOR_TEXT_MUTED};")
+        root.addWidget(subtitle)
 
         desc = QLabel(_DESCRIPTION)
         desc.setObjectName("placeholder")
@@ -304,3 +310,12 @@ class SubmitScreen(QWidget):
         msg_names = [os.path.basename(p) for p in self._msg_paths]
         git_names = [os.path.basename(p) for p in self._git_paths]
         return [*doc_names, *msg_names, *git_names]
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        w = self.width()
+        h = self.height()
+        # 퍼센트 마진 (좌우 15%, 상하 10%)
+        margin_x = max(T.SPACING_XL, int(w * 0.15))
+        margin_y = max(T.SPACING_XL, int(h * 0.10))
+        self.layout().setContentsMargins(margin_x, margin_y, margin_x, margin_y)

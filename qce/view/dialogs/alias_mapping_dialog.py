@@ -14,7 +14,8 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
-    QGridLayout,
+    QHBoxLayout,
+    QFrame,
     QLabel,
     QVBoxLayout,
     QWidget,
@@ -41,9 +42,9 @@ class AliasMappingDialog(QDialog):
         root.setContentsMargins(T.SPACING_LG, T.SPACING_LG, T.SPACING_LG, T.SPACING_LG)
         root.setSpacing(T.SPACING_MD)
         self._rows_host = QWidget()
-        self._grid = QGridLayout(self._rows_host)
-        self._grid.setHorizontalSpacing(T.SPACING_MD)
-        self._grid.setVerticalSpacing(T.SPACING_XS)
+        self._list_layout = QVBoxLayout(self._rows_host)
+        self._list_layout.setContentsMargins(0, 0, 0, 0)
+        self._list_layout.setSpacing(T.SPACING_SM)
         root.addWidget(self._rows_host)
 
         buttons = QDialogButtonBox(
@@ -60,8 +61,8 @@ class AliasMappingDialog(QDialog):
     def populate(self, identifiers: list[dict]) -> None:
         """식별자 dict(raw_id/source/activity)를 행으로 생성. 모든 식별자 빠짐없이 표시."""
         # 기존 행 제거
-        while self._grid.count():
-            item = self._grid.takeAt(0)
+        while self._list_layout.count():
+            item = self._list_layout.takeAt(0)
             w = item.widget()
             if w is not None:
                 w.deleteLater()
@@ -72,16 +73,25 @@ class AliasMappingDialog(QDialog):
             raw_id = ident[K_RAW_ID]
             src = _SOURCE_LABELS.get(ident.get(K_SOURCE), ident.get(K_SOURCE, ""))
             activity = ident.get(K_ACTIVITY, 0)
+            
+            row_frame = QFrame()
+            row_frame.setObjectName("card")
+            row_layout = QHBoxLayout(row_frame)
+            row_layout.setContentsMargins(T.SPACING_MD, T.SPACING_SM, T.SPACING_MD, T.SPACING_SM)
+            
             label = QLabel(f"{raw_id}  ·  {src}  ·  활동 {activity}")
             combo = QComboBox()
+            combo.setFixedWidth(160)
             combo.addItem(PLACEHOLDER)
             combo.addItems(self._members)
             combo.currentTextChanged.connect(
                 lambda _t, rid=raw_id: self._update_row_style(rid)
             )
 
-            self._grid.addWidget(label, r, 0)
-            self._grid.addWidget(combo, r, 1)
+            row_layout.addWidget(label, stretch=1)
+            row_layout.addWidget(combo)
+            self._list_layout.addWidget(row_frame)
+            
             self._combos[raw_id] = combo
             self._row_labels[raw_id] = label
             self._update_row_style(raw_id)

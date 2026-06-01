@@ -108,7 +108,7 @@ class AnalysisPanel(QFrame):
 
         # [분석 시작]: 가운데 정렬, pill, COLOR_PRIMARY — 화면의 유일한 강조 버튼
         self._analyze_btn = QPushButton("분석 시작")
-        self._analyze_btn.setObjectName("primary")
+        self._analyze_btn.setObjectName("submitBtn")
         self._analyze_btn.clicked.connect(self.analyze_clicked.emit)
         btn_row = QHBoxLayout()
         btn_row.addStretch(1)
