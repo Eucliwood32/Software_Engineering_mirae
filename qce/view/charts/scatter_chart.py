@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import math
 
+from matplotlib.patches import Rectangle
 from PyQt6.QtCore import pyqtSignal
 
 from qce.view.charts.base_chart import BaseChartWidget
@@ -32,6 +33,7 @@ class ScatterChartWidget(BaseChartWidget):
     DOT_MISSING = T.DOT_MISSING
 
     def _render_static(self) -> None:
+        """산점도 정적 요소 렌더 (사분면·십자선·점·라벨). 기준점은 항상 (0.5, 0.5)."""
         self.ax.clear()
         self.ax.set_xlim(0.0, 1.0)
         self.ax.set_ylim(0.0, 1.0)
@@ -88,9 +90,7 @@ class ScatterChartWidget(BaseChartWidget):
         for label, (x0, x1), (y0, y1) in regions:
             color = T.QUADRANT_COLORS[label]
             self.ax.add_patch(
-                __import__("matplotlib.patches", fromlist=["Rectangle"]).Rectangle(
-                    (x0, y0), x1 - x0, y1 - y0, color=color, alpha=0.0, zorder=0
-                )
+                Rectangle((x0, y0), x1 - x0, y1 - y0, color=color, alpha=0.0, zorder=0)
             )
             txt = self.ax.text(
                 (x0 + x1) / 2, (y0 + y1) / 2, label,
