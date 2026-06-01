@@ -14,10 +14,11 @@ class GitAnalyzer:
                 ["git", "-C", repo_path, "log",
                  "--numstat", "--format=%H|%ae|%ai", "--no-merges"],
                 capture_output=True, text=True,
+                encoding="utf-8", errors="replace",  # git 출력은 UTF-8 — 로케일(cp949 등) 디코딩 금지
                 timeout=self.GIT_TIMEOUT, check=True,
             )
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired,
-                FileNotFoundError, OSError):
+                FileNotFoundError, OSError, UnicodeError):
             return {}
 
         return self._parse_output(result.stdout)

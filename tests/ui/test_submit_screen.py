@@ -1,6 +1,8 @@
 """FR-5.5 — SubmitScreen UI (L3)."""
 from __future__ import annotations
 
+import os
+
 from qce.view.panels.analysis_panel import AnalysisPanel
 from qce.view.panels.submit_screen import SubmitScreen
 
@@ -38,6 +40,31 @@ def test_mixed_drop(qtbot):
     w._handle_dropped_paths(["report.docx", "chat.txt"])
     assert docs_seen == [["report.docx"]]
     assert msgs_seen == ["chat.txt"]
+
+
+def test_folder_drop_expands(qtbot, tmp_path):
+    """폴더를 드롭하면 내부 문서·.txt를 펼치고 .git 폴더는 Git 저장소로 인식한다.
+    Git 저장소 내부 파일(work.txt)은 수집 대상에서 제외된다."""
+    proj = tmp_path / "proj"
+    (proj / "docs").mkdir(parents=True)
+    (proj / "docs" / "a.docx").write_text("x", encoding="utf-8")
+    (proj / "docs" / "b.pptx").write_text("x", encoding="utf-8")
+    (proj / "chat.txt").write_text("x", encoding="utf-8")
+    (proj / "repo" / ".git").mkdir(parents=True)      # Git 저장소로 위장
+    (proj / "repo" / "work.txt").write_text("x", encoding="utf-8")
+
+    w = SubmitScreen()
+    qtbot.addWidget(w)
+    docs_seen, msgs_seen, git_seen = [], [], []
+    w.documents_dropped.connect(docs_seen.append)
+    w.messenger_dropped.connect(msgs_seen.append)
+    w.git_repo_chosen.connect(git_seen.append)
+
+    w._handle_dropped_paths([str(proj)])
+
+    assert {os.path.basename(p) for p in docs_seen[0]} == {"a.docx", "b.pptx"}
+    assert [os.path.basename(m) for m in msgs_seen] == ["chat.txt"]   # repo/work.txt 제외
+    assert [os.path.basename(g) for g in git_seen] == ["repo"]
 
 
 def test_loaded_summary(qtbot):                                 # TC-FR-5.5-04

@@ -23,6 +23,9 @@ qce_error.log
 chat.txt
 *_group.txt
 
+# 샘플 데이터 — Git 저장소는 중첩 git이므로 제외
+sample_data/repo/
+
 # IDE
 .idea/
 *.swp
