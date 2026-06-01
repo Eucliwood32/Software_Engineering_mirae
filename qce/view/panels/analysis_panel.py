@@ -1,12 +1,15 @@
 """
 AnalysisPanel — 가중치 프리셋·슬라이더·합계 검증 표시 (view-design §6.5, FR-4.4).
 
-프리셋 버튼 3개 + 슬라이더 3개(0.00~1.00, step 0.05) + 합계 라벨 + [분석 시작].
+프리셋 버튼 3개 + 슬라이더 3개(0%~100%, step 5%) + 합계 라벨 + [분석 시작].
 
-합계==1.0 판정 로직은 Model(WeightPresetManager)의 책임이다(§6.5). 본 패널은
+합계==100% 판정 로직은 Model(WeightPresetManager)의 책임이다(§6.5). 본 패널은
 슬라이더 변경 시 weights_changed를 발행하고, Controller가 검증 결과를
 set_analyze_enabled/set_weight_warning으로 되돌려준다. View는 합계 계산 로직을
 보유하지 않는다(합계 라벨은 단순 표시용).
+
+UI 표시: 내부 0.0~1.0 값을 ×100하여 퍼센트(%) 단위로 표기한다.
+슬라이더 step은 내부 0.05(=5%), 합계 라벨은 "합계: 100%" 형식.
 """
 from __future__ import annotations
 
@@ -62,8 +65,8 @@ class AnalysisPanel(QWidget):
             self._sliders[key] = s
             row.addWidget(s)
 
-            v_label = QLabel("0.00")
-            v_label.setMinimumWidth(35)
+            v_label = QLabel("0%")
+            v_label.setMinimumWidth(40)
             v_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             self._value_labels[key] = v_label
             row.addWidget(v_label)
@@ -121,7 +124,7 @@ class AnalysisPanel(QWidget):
         s.setValue(int(round(value / _STEP)))
         s.blockSignals(False)
         if hasattr(self, "_value_labels"):
-            self._value_labels[key].setText(f"{value:.2f}")
+            self._value_labels[key].setText(f"{round(value * 100)}%")
 
     def _on_slider_dragged(self, changed_key: str, value: int) -> None:
         new_val = value * _STEP
@@ -161,7 +164,7 @@ class AnalysisPanel(QWidget):
 
     def _refresh_sum_label(self) -> None:
         total = sum(self.current_weights().values())
-        self._sum_label.setText(f"합계: {total:.2f}")
+        self._sum_label.setText(f"합계: {round(total * 100)}%")
 
     # --- 테스트 접근자 ---
     def analyze_enabled(self) -> bool:

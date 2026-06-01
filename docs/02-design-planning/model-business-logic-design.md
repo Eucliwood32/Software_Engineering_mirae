@@ -3,7 +3,7 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 문서 버전 | v1.4 |
+| 문서 버전 | v1.5 |
 | 작성일 | 2026-06-01 |
 | 상위 문서 | Architecture Overview v1.3, Requirements Record v1.5, Development Constraints v2.0, Controller Design v1.2 |
 | 관련 ADR | ADR-0004 (JSON 캐시 vs pickle) |
@@ -140,21 +140,21 @@ class MemberScore:                      # FR-4.* 통합 결과
 
 ### 2.4 WeightPresetManager (FR-4.4)
 
-- **책임:** 조장이 UI에서 선택할 수 있는 3가지 가중치 프리셋을 관리하고, 커스텀 가중치의 합계 유효성을 검증한다.
+- **책임:** 조장이 UI에서 선택할 수 있는 3가지 가중치 프리셋을 관리하고, 커스텀 가중치의 합계 유효성을 검증한다. UI 표시 단위는 **퍼센트(%)** 이며, 내부 연산은 0.0~1.0 소수로 수행한 뒤 View에서 ×100 변환하여 표시한다.
 - **프리셋 상수 (Git, 문서, 메신저 순서):**
 
   | 프리셋명 | Git | 문서 | 메신저 |
   | :--- | :--- | :--- | :--- |
-  | 개발 중심 | 0.60 | 0.25 | 0.15 |
-  | 기획 중심 | 0.20 | 0.60 | 0.20 |
-  | 균형 설정 | 0.40 | 0.40 | 0.20 |
+  | 개발 중심 | 60% | 25% | 15% |
+  | 기획 중심 | 20% | 60% | 20% |
+  | 균형 설정 | 40% | 40% | 20% |
 
 - **시그니처:**
   ```python
   class WeightPresetManager:
       PRESETS: dict[str, tuple[float, float, float]]
       def validate_sum(self, w_git: float, w_doc: float, w_msg: float) -> bool:
-          """합 1.0 여부 검증. 부동소수점 오차 ±0.0001 허용."""
+          """합 1.0(=100%) 여부 검증. 부동소수점 오차 ±0.0001 허용."""
       def preset_names(self) -> list[str]: ...
       def get_preset(self, name: str) -> dict[str, float]:
           """프리셋명 → {"git","doc","msg"}."""
@@ -166,15 +166,16 @@ class MemberScore:                      # FR-4.* 통합 결과
           """음수 0 처리 후 합 1.0으로 비례 정규화(합 0이면 균등 분배)."""
       def redistribute(self, changed_key: str, new_value: float, current: dict) -> dict[str, float]:
         """UI 실시간 연동 지원: 한 축(changed_key)을 new_value로 변경 시,
-           나머지 두 축을 기존 비율대로 비례 재분배해 합 1.0 유지. 
+           나머지 두 축을 기존 비율대로 **동일 비율로** 비례 재분배해 합 1.0(=100%) 유지.
+           나머지 합이 0이면 잔여를 균등 분배.
            반올림 잔차는 마지막 축이 흡수한다."""
   ```
 - **알고리즘:**
   - `validate_sum()`: `abs(w_git + w_doc + w_msg - 1.0) < 0.0001`이면 `True`.
   - `normalize()`: 각 값을 `max(0, v)`로 보정 후 합으로 나눠 비례 축소한다(상한 클램프는 하지 않아 임의 양수 크기 입력도 처리). 합이 0이면 1/3 균등 분배. 소수 4자리 반올림 후 잔차를 마지막 축에 흡수해 합을 정확히 1.0으로 맞춘다.
-  - `redistribute()`: 변경 축을 `clamp(new_value)`로 고정하고, 잔여(`1 - fixed`)를 나머지 두 축의 기존 비율대로 배분한다. 나머지 합이 0이면 잔여를 균등 분배. 잔차는 마지막 축이 흡수한다. 모든 연산은 결정론적이다(NFR-1.3).
+  - `redistribute()`: 변경 축을 `clamp(new_value)`로 고정하고, 잔여(`1 - fixed`)를 나머지 두 축의 **기존 비율(각 값 / 나머지 합)대로 동일 비율로** 배분한다. 이로써 하나의 슬라이더를 조절하면 나머지 슬라이더들이 같은 비율로 증감한다(최댓값 축만 우선 줄어드는 것이 아니라, 모든 나머지 축이 현재 비율을 유지하며 균일하게 조절). 나머지 합이 0이면 잔여를 균등 분배. 잔차는 마지막 축이 흡수한다. 모든 연산은 결정론적이다(NFR-1.3).
   - `match_preset()`: PRESETS를 순회하며 ±0.0001 이내로 일치하는 프리셋명을 반환, 없으면 `None`.
-  - UI 연동 (개선사항): View의 AnalysisPanel 슬라이더 값 변경 시 `redistribute`가 즉시 호출되어 나머지 슬라이더 바를 자동으로 비례 연동(갱신)하고, 변경된 수치값을 UI에 텍스트로 실시간 표기한다 (FR-4.4). 합 ≠ 1.0일 경우 [분석 시작] 버튼이 비활성화되고 경고 문구가 표시된다.
+  - UI 연동 (개선사항): View의 AnalysisPanel 슬라이더 값 변경 시 `redistribute`가 즉시 호출되어 나머지 슬라이더 바를 자동으로 비례 연동(갱신)하고, 변경된 수치값을 **퍼센트(%) 단위**로 UI에 텍스트로 실시간 표기한다 (FR-4.4). 합계 표시도 `"합계: 100%"` 형식이다. 합 ≠ 100%일 경우 [분석 시작] 버튼이 비활성화되고 경고 문구가 표시된다.
 
 ---
 
@@ -411,3 +412,4 @@ msgs: {author: count} ──┤                   │         │
 | **v1.2** | **2026-05-31** | **(1) AliasMapper §2.6에 호출 방식 명시 — 1차 분석=항등 매핑, 병합 재집계=결과 화면 사후 재호출 (FR-1.3 개정, Controller Design v1.1 §4 연동). (2) ContributionAggregator §2.7에 병합 재집계 경로 및 재정규화 필요성 명시 (FR-5.7). (3) ContributionAggregator §2.7에 출력 소비 방식(INV-V1 — asdict 직렬화는 Controller 책임) 명시. (4) 상위 문서 목록에 Controller Design v1.1 추가.** | QCE 개발팀 |
 | **v1.3** | **2026-05-31** | **구 SRS.md 폐지 반영 및 구현분 정합화(A1~A4). (1) §1.4 데이터 타입을 실제 코드 필드명으로 정합화(`raw_chars`·`raw_messages`·`signals`) 및 신규 필드 `signal_details`·`commit_dates`, `CommitStats.commits_list` 추가 + signal_details 원소 구조 명세. (2) §2.3 AnomalySignalDetector에 `detect_capping`·`detect_zscore_detail`·`build_signal_details` 추가, 실현 FR에 FR-4.2·FR-4.2d(Z-Score) 반영. (3) §2.4 WeightPresetManager에 `normalize`·`redistribute`·`match_preset`·`clamp`·`get_preset`·`preset_names` 추가(FR-4.4 보조 연산). (4) **§2.10 NormalizedSignalsTracker 신설(FR-4.2c 예외 처리)** — 번호 체계 4.2c=예외·4.2d=Z-Score (RR v1.5 정합). (5) **§2.11 AliasExtractor 신설(FR-1.3 결정론적 병합 후보 제안)**. (6) §2.6 AliasMapper에 AliasExtractor 후보 제안 연동 명시. (7) §4 RTM에 NormalizedSignalsTracker·AliasExtractor 행 추가. 상세 View 설계는 view-design.md, Controller 배선은 controller-design.md 참조.** | QCE 개발팀 |
 | v1.4 | 2026-06-01 | 사용자 피드백(UI/UX 개선) 반영: (1) §1.4 MemberScore 데이터 클래스에 시각화 툴팁 노출용 원시 데이터 필드(raw_additions, raw_chars, raw_messages) 추가. (2) §2.4 WeightPresetManager에 UI 가중치 실시간 비례 연동 및 텍스트 수치 표기를 지원하기 위한 redistribute 메서드의 UI 연동 책임 명시. | QCE 개발팀 |
+| **v1.5** | **2026-06-01** | **사용자 피드백(슬라이더 비례 분배 버그·표기 개선) 반영: (1) §2.4 WeightPresetManager `redistribute` 알고리즘 설명에 "나머지 두 축이 같은 비율로 증감"하는 동작을 명확히 기술(최댓값 축만 우선 줄어드는 기존 동작 교정). (2) 가중치 UI 표기 단위를 소수(1.00) 기준에서 퍼센트(100%) 기준으로 변경 — 프리셋 표, validate_sum, 합계 라벨, 경고 문구 포함.** | QCE 개발팀 |

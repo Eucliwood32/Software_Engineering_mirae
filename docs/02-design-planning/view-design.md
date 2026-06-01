@@ -3,7 +3,7 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 문서 버전 | v1.5 |
+| 문서 버전 | v1.7 |
 | 작성일 | 2026-06-01 |
 | 준수 표준 | ISO/IEC/IEEE 29148-2018, ISO/IEC/IEEE 42010 (아키텍처 기술) |
 | 상위 문서 | architecture-overview.md v1.3, Requirements Record v1.5, Concept of Operations v1.3, Development Constraints v2.0 |
@@ -345,7 +345,7 @@ class SaveReportDialog(QObject):
 ```
 
 ### 6.5 AnalysisPanel `analysis_panel.py` (~270) — FR-4.4
-프리셋 버튼 3개 + 슬라이더 3개(0.00~1.00, step 0.05) + 합계 라벨 + [분석 시작]. 합계 ≠ 1.0이면 버튼 비활성 + 경고.
+프리셋 버튼 3개 + 슬라이더 3개(0%~100%, step 5%) + 합계 라벨(`"합계: 100%"`) + [분석 시작]. 합계 ≠ 100%이면 버튼 비활성 + 경고. 하나의 슬라이더를 조절하면 나머지 슬라이더들이 **기존 비율을 유지하며 같은 비율로** 자동 조절되어 항상 합계 100%를 유지한다.
 
 ```python
 class AnalysisPanel(QWidget):
@@ -362,11 +362,11 @@ class AnalysisPanel(QWidget):
     def current_weights(self) -> dict[str, float]: ...
     def set_analyze_enabled(self, enabled: bool) -> None: ...
     def set_weight_warning(self, msg: str | None) -> None:
-        """msg=None이면 경고 해제. 형식 '가중치 합계가 1.00이어야 합니다. 현재: X.XX'."""
+        """msg=None이면 경고 해제. 형식 '가중치 합계가 100%여야 합니다 (현재 XX%)'."""
     def update_weight_labels(self) -> None:
-        """[개선] 슬라이더 조작 시 비례 연동된 현재 가중치 값을 숫자로 실시간 표기한다."""
+        """[개선] 슬라이더 조작 시 비례 연동된 현재 가중치 값을 퍼센트(%)로 실시간 표기한다."""
 ```
-> **합계 검증의 위치.** 합=1.0 판정 자체는 Model(WeightPresetManager.validate_sum)의 책임이다. AnalysisPanel은 슬라이더 값 변경 시 `weights_changed`를 올리고, Controller가 검증 결과를 `set_analyze_enabled`/`set_weight_warning`으로 되돌려준다. View는 합계 계산 로직을 보유하지 않는다.
+> **합계 검증의 위치.** 합=100%(내부 1.0) 판정 자체는 Model(WeightPresetManager.validate_sum)의 책임이다. AnalysisPanel은 슬라이더 값 변경 시 `weights_changed`를 올리고, Controller가 검증 결과를 `set_analyze_enabled`/`set_weight_warning`으로 되돌려준다. View는 합계 계산 로직을 보유하지 않으며, 표시만 퍼센트 단위로 수행한다.
 
 ### 6.6 DashboardView `dashboard_view.py` (~150) — FR-5.1
 세 차트의 컨테이너이자 **차트간 Signal 중재자**(결정 B). 신호는 (1) 가벼운 한 줄 요약 라벨과 (2) **카드 패널 `AnomalySignalPanel`(§6.12, FR-4.2/4.2b/4.2d 표시·4.2c 예외)** 두 가지로 표시한다. 카드의 "정상으로 표시"는 직접 처리하지 않고 `signal_dismissed`로 상위에 중계만 한다(INV-V1). 입력은 점수 dict 목록이다(§5.3).
@@ -749,3 +749,4 @@ GRID_STEP          = 0.2
 | **v1.4** | **2026-05-31** | **구 SRS.md 폐지 반영 — 이상 신호 카드 UI·신원 매핑 추천 도입. (1) **§6.12 AnomalySignalPanel 신설**(FR-4.2/4.2b/4.2d 신호 카드 + FR-4.2c "정상으로 표시" 버튼, `signal_dismissed` 중계만). (2) §6.6 DashboardView에 `signals_panel`·`signal_dismissed` 통합. (3) §6.11 ResultScreen에 `signal_dismissed` 중계·`set_suggested_mapping` 추가. (4) §6.3 AliasMappingDialog에 `apply_suggested`(AliasExtractor 추천 기본선택, 자동병합 아님) 추가. (5) §5.1에 `signal_dismissed`, §5.2에 `set_suggested_mapping` 행 추가. (6) §5.3 점수 dict 스키마에 `signal_details`·`commit_dates` 키 및 contract 상수 `K_SIGNAL_DETAILS`·`K_COMMIT_DATES` 추가, signals 예시 갱신. (7) §12 RTM에 AnomalySignalPanel 행 추가. Model 측 상세는 model-business-logic-design.md v1.3 §2.10·§2.11, 배선은 controller-design.md 참조. | QCE 개발팀 |
 | v1.5 | 2026-06-01 | 사용자 피드백(UI/UX 개선 및 버그 수정) 반영: (1) §6.3 AliasMappingDialog 미선택 시 OK 버튼 방어 로직 추가. (2) §6.5 AnalysisPanel에 설명 문구('작업 종류 별 반영 비율') 및 실시간 숫자 표기 갱신 메서드 추가. (3) §6.6/§7.1 placeholder 안내 문구를 '분석할 데이터가 없습니다.'로 변경. (4) §6.9 SubmitScreen에 입력 데이터 리셋(clear_inputs) 및 파일명("없음" 포함) 노출 사양 추가. (5) §6.11 ResultScreen에 매핑 취소 UI 증발 방지 메서드(reset_mapping_state) 추가. (6) §7.2/§7.4 차트 툴팁 구성에 원시 데이터(Raw data) 노출 구체화. | QCE 개발팀 |
 | v1.6 | 2026-06-01 | 사용자 피드백(드롭존 UX 개선) 반영: §6.9 SubmitScreen 드롭존이 적재 상태에 따라 분기 렌더하도록 사양 추가 — 빈 상태는 기존 안내 문구, 1개 이상 적재 시 종류별 아이콘(문서 📄 / 메신저 💬 / Git 🗂) + 파일명(basename) 목록을 좌측 정렬로 표시. `_refresh_dropzone`·`loaded_files()` 접근자 명시. | QCE 개발팀 |
+| **v1.7** | **2026-06-01** | **사용자 피드백(슬라이더 비례 분배·표기 개선) 반영: (1) §6.5 AnalysisPanel 슬라이더 범위 표기를 0.00~1.00에서 0%~100%(step 5%)로 변경. (2) 합계 라벨·경고 문구를 퍼센트 단위(`"합계: 100%"`, `"가중치 합계가 100%여야 합니다"`)로 변경. (3) 슬라이더 비례 재분배 동작 설명에 "나머지 슬라이더들이 기존 비율을 유지하며 같은 비율로 자동 조절" 명시.** | QCE 개발팀 |

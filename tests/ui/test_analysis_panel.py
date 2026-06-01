@@ -41,7 +41,7 @@ def test_set_analyze_enabled(qtbot):                            # TC-FR-4.4-07/0
 def test_weight_warning(qtbot):                                 # TC-FR-4.4-07
     p = AnalysisPanel()
     qtbot.addWidget(p)
-    msg = "가중치 합계가 1.00이어야 합니다. 현재: 1.50"
+    msg = "가중치 합계가 100%여야 합니다 (현재 150%)"
     p.set_weight_warning(msg)
     assert p.weight_warning_text() == msg
     p.set_weight_warning(None)
@@ -83,6 +83,6 @@ def test_slider_value_labels(qtbot):
     qtbot.addWidget(p)
     p.apply_preset("균형 설정")
     
-    assert p._value_labels["w_git"].text() == "0.40"
-    assert p._value_labels["w_doc"].text() == "0.40"
-    assert p._value_labels["w_msg"].text() == "0.20"
+    assert p._value_labels["w_git"].text() == "40%"
+    assert p._value_labels["w_doc"].text() == "40%"
+    assert p._value_labels["w_msg"].text() == "20%"

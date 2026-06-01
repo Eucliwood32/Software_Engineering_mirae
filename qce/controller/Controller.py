@@ -348,7 +348,7 @@ class AppController:
             panel.set_weight_warning(None)
         else:
             panel.set_analyze_enabled(False)
-            panel.set_weight_warning(f"가중치 합계가 1.00이어야 합니다 (현재 {total:.2f})")
+            panel.set_weight_warning(f"가중치 합계가 100%여야 합니다 (현재 {round(total * 100)}%)")
 
     def _on_analyze_clicked(self) -> None:
         config = {

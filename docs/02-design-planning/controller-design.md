@@ -3,7 +3,7 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 문서 버전 | v1.3 |
+| 문서 버전 | v1.4 |
 | 작성일 | 2026-06-01 |
 | 상위 문서 | Architecture Overview v1.3, Requirements Record v1.5, View Design v1.4 |
 | 관련 모듈 | `AppController`, `AnalysisOrchestrator` |
@@ -45,7 +45,7 @@ Controller 레이어는 크게 전역 상태와 라우팅을 담당하는 `AppCo
   | :--- | :--- |
   | 기동 — 캐시 없음 | `show_submit()` |
   | 기동 — 캐시 단독 로드 성공 | 즉시 `show_result()` (NFR-2.4) |
-  | `analyze_clicked` (가중치 합 1.0) | `show_loading()` |
+  | `analyze_clicked` (가중치 합 100%) | `show_loading()` |
   | `completed` | `show_result()` |
   | `failed` | `show_submit()` + 오류 안내 |
   | `new_analysis_requested` | 상태 초기화 → `show_submit()` |
@@ -223,3 +223,4 @@ ResultScreen.merge_requested(mapping={alias → member})
 | **v1.1** | **2026-05-31** | **(1) 3-스크린 전환 조율 추가 (FR-5.4). (2) 분석-전 매핑 모달 폐기·1차 분석 항등 매핑으로 FR-1.3 개정 반영. (3) 결과 화면 계정 병합 재집계 흐름 신규 §6 추가 (FR-5.7). (4) View 타입 격리(INV-V1) — asdict 직렬화 명시. (5) AnalysisOrchestrator에 원시 지표 보유 책임 추가. (6) AppController 신호 connect 목록 갱신 (merge_requested, new_analysis_requested 추가, alias_mapping_requested 제거). (7) RTM §5 갱신 (FR-5.4, FR-5.7, NFR-2.4, INV-V1, FR-1.3 개정). (8) 상위 문서를 Architecture v1.2·RR v1.4·View Design v1.3로 갱신.** | QCE 개발팀 |
 | **v1.2** | **2026-05-31** | **구 SRS.md 폐지 반영 — 신호 예외 처리·신원 추천 배선 추가. (1) §2.1 인터페이스에 `on_signal_dismissed`·`_render_results` 추가 및 배선 설명(c) — `NormalizedSignalsTracker`(FR-4.2c) 보유, "정상으로 표시"는 재집계 없이 표시만 갱신(점수 불변, STR-7), 새 분석 시 `tracker.clear()`. (2) `_render_results`가 `AliasExtractor.suggest_groups`로 병합 후보를 만들어 `set_suggested_mapping`으로 전달(FR-1.3, 자동병합 아님). (3) 신호 connect 목록에 `ResultScreen.signal_dismissed` 추가. (4) RTM §5에 FR-4.2c 행 추가, FR-1.3 행에 추천 명시. (5) 상위 문서를 Architecture v1.3·RR v1.5·View Design v1.4로 갱신.** | QCE 개발팀 |
 | v1.3 | 2026-06-01 | 사용자 피드백(UX 버그 개선) 반영: (1) §2.1 AppController의 on_new_analysis_requested 시그니처에 [새 분석] 진입 시 파일명/저장소 등 이전 뷰 데이터의 완전 초기화(리셋) 제어 책임 명문화. (2) §4 파이프라인 제어 원칙에 카카오톡 등 단일 소스 입력 시의 파이프라인 정상 구동 보장 명시. | QCE 개발팀 |
+| **v1.4** | **2026-06-01** | **사용자 피드백(슬라이더 비례 분배·표기 개선) 반영: (1) §2.1 화면 전환 조건표에서 가중치 합 표기를 1.0에서 100%로 변경. (2) `_on_weights_changed` 경고 문구를 퍼센트 단위로 변경.** | QCE 개발팀 |
