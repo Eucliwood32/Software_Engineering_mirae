@@ -6,7 +6,7 @@ Y축 0.0~1.0 고정, 그리드 0.2, 1위 강조색, 평균선, 수치 레이블,
 """
 from __future__ import annotations
 
-from matplotlib.ticker import MultipleLocator
+from matplotlib.ticker import MaxNLocator
 
 from qce.view.charts.base_chart import BaseChartWidget
 from qce.view.contract import (
@@ -32,12 +32,23 @@ class BarChartWidget(BaseChartWidget):
         totals = [float(m[K_TOTAL]) for m in self._scores]
         xs = list(range(len(authors)))
 
-        self.ax.set_ylim(0.0, 1.0)              # Y 0.0~1.0 고정
+        if totals:
+            y_min = min(totals)
+            y_max = max(totals)
+            y_range = y_max - y_min
+            if y_range > 0:
+                margin = y_range / 8.0
+                self.ax.set_ylim(max(0.0, y_min - margin), y_max + margin)
+            else:
+                self.ax.set_ylim(max(0.0, y_min - 0.1), y_min + 0.1)
+        else:
+            self.ax.set_ylim(0.0, 1.0)
+            
         self.ax.set_xticks(xs)
         self.ax.set_xticklabels(authors)
-        self.ax.yaxis.set_major_locator(MultipleLocator(T.GRID_STEP))  # 그리드 0.2
+        self.ax.yaxis.set_major_locator(MaxNLocator(5))
         self.ax.grid(axis="y", color=T.COLOR_GRID, linewidth=0.6, zorder=0)
-        self._style_axes(self.ax)               # [v2.0] 라이트/다크 축 채색
+        self._style_axes(self.ax)
 
         # 1위 강조색 + 나머지 기본색
         top_idx = max(xs, key=lambda i: totals[i]) if totals else -1

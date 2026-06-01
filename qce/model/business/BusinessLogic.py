@@ -77,11 +77,11 @@ class Normalizer:
 
 class CappingScaler:
     """FR-4.2: 비정상적 대량 추가에 의한 지표 왜곡 방지 (상한 제한 및 로그 스케일링)"""
-    CAPPING_THRESHOLD: int = 1000
+    CAPPING_THRESHOLD: int = 10000
 
     def cap(self, additions: int) -> Tuple[int, bool]:
         if additions > self.CAPPING_THRESHOLD:
-            return (1000, True)
+            return (10000, True)
         return (additions, False)
 
     def log_scale(self, total: int) -> float:
@@ -126,7 +126,7 @@ class AnomalySignalDetector:
         return signals
 
     def detect_capping(self, repo: Dict[str, CommitStats]) -> List[dict]:
-        """FR-4.2: 단일 커밋 추가 라인 > 1000인 커밋을 신호로."""
+        """FR-4.2: 단일 커밋 추가 라인 > 10000인 커밋을 신호로."""
         signals = []
         for author, stats in repo.items():
             for c in stats.commits_list:

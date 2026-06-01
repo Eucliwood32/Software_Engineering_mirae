@@ -47,7 +47,7 @@ class DashboardView(QWidget):
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
-        root.setSpacing(T.SPACING_SECTION)
+        root.setSpacing(T.SPACING_SECTION * 2)
 
         self._add_chart_section(
             root, "팀원별 종합 기여도",

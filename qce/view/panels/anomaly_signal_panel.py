@@ -55,7 +55,7 @@ def _describe(author: str, detail: dict) -> str:
         return (
             f"{author}  ·  커밋 {detail.get('hash', '?')}  ·  "
             f"{detail.get('date', '')}  ·  +{detail.get('additions', 0):,}줄"
-            f"  (1,000줄 초과 → 캡핑)"
+            f"  (10,000줄 초과 → 캡핑)"
         )
     if t == "EW-02":
         return (
@@ -123,15 +123,12 @@ class AnomalySignalPanel(QWidget):
         self._empty.setObjectName("signalEmpty")
         root.addWidget(self._empty)
 
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
         self._host = QWidget()
         self._host_layout = QVBoxLayout(self._host)
         self._host_layout.setContentsMargins(0, 0, 0, 0)
+        self._host_layout.setSpacing(T.SPACING_SM)
         self._host_layout.addStretch(1)
-        scroll.setWidget(self._host)
-        root.addWidget(scroll, stretch=1)
+        root.addWidget(self._host, stretch=1)
 
         self._cards: list[_SignalCard] = []
 

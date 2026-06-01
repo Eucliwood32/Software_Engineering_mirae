@@ -42,40 +42,51 @@ class SettingsDialog(QDialog):
         root.setSpacing(T.SPACING_MD)
 
         # --- 다크 모드 스위치 ---
+        display_frame = QFrame()
+        display_frame.setObjectName("card")
+        display_layout = QVBoxLayout(display_frame)
+        display_layout.setContentsMargins(T.SPACING_LG, T.SPACING_LG, T.SPACING_LG, T.SPACING_LG)
+        display_layout.setSpacing(T.SPACING_MD)
+
         title = QLabel("화면")
         title.setStyleSheet(f"font-size: {T.FONT_SUBTITLE}px; font-weight: 600;")
-        root.addWidget(title)
+        display_layout.addWidget(title)
 
         self._dark_switch = QCheckBox("다크 모드")
         self._dark_switch.setChecked(theme_manager.is_dark())   # 현재 테마와 동기화
         self._dark_switch.toggled.connect(theme_manager.set_dark)
-        root.addWidget(self._dark_switch)
+        display_layout.addWidget(self._dark_switch)
 
         hint = QLabel("끄면 라이트 모드로, 켜면 다크 모드로 전환됩니다.\n"
                       "(앱 시작 시에는 Windows 설정을 자동으로 따릅니다.)")
         hint.setObjectName("placeholder")
         hint.setWordWrap(True)
-        root.addWidget(hint)
-
-        # --- 구분선 ---
-        line = QFrame()
-        line.setFrameShape(QFrame.Shape.HLine)
-        line.setFrameShadow(QFrame.Shadow.Sunken)
-        root.addWidget(line)
+        display_layout.addWidget(hint)
+        
+        root.addWidget(display_frame)
 
         # --- Staff Credit ---
+        staff_frame = QFrame()
+        staff_frame.setObjectName("card")
+        staff_layout = QVBoxLayout(staff_frame)
+        staff_layout.setContentsMargins(T.SPACING_LG, T.SPACING_LG, T.SPACING_LG, T.SPACING_LG)
+        staff_layout.setSpacing(T.SPACING_SM)
+
         staff_title = QLabel("Staff Credit")
         staff_title.setStyleSheet(f"font-size: {T.FONT_SUBTITLE}px; font-weight: 600;")
-        root.addWidget(staff_title)
+        staff_layout.addWidget(staff_title)
 
         for name, sid in self.STAFF:
             row = QLabel(f"{name}  ·  {sid}")
             row.setAlignment(Qt.AlignmentFlag.AlignLeft)
-            root.addWidget(row)
+            staff_layout.addWidget(row)
 
+        staff_layout.addSpacing(T.SPACING_SM)
         team = QLabel("QCE — 부탁해 꼬마선장 개발팀")
         team.setObjectName("placeholder")
-        root.addWidget(team)
+        staff_layout.addWidget(team)
+        
+        root.addWidget(staff_frame)
 
     # --- 테스트 접근자 ---
     def is_dark_checked(self) -> bool:

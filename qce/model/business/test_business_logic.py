@@ -91,16 +91,16 @@ class TestCappingScaler:
         self.cs = CappingScaler()
 
     def test_cap_over_threshold(self):
-        assert self.cs.cap(5000) == (1000, True)
+        assert self.cs.cap(15000) == (10000, True)
 
     def test_cap_under_threshold(self):
-        assert self.cs.cap(999) == (999, False)
+        assert self.cs.cap(9999) == (9999, False)
 
     def test_cap_at_boundary(self):
-        assert self.cs.cap(1000) == (1000, False)
+        assert self.cs.cap(10000) == (10000, False)
 
     def test_cap_just_above_boundary(self):
-        assert self.cs.cap(1001) == (1000, True)
+        assert self.cs.cap(10001) == (10000, True)
 
     def test_log_scale_zero(self):
         assert self.cs.log_scale(0) == 0.0

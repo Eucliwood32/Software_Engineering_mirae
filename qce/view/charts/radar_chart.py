@@ -123,12 +123,24 @@ class RadarChartWidget(BaseChartWidget):
         self._angles = [i / n_axes * 2 * math.pi for i in range(n_axes)]
 
         n_members = len(self._scores)
-        # GridSpec 1행: [종합 | 범례 | 개인×N]. 범례 열에 여백을 둬 폴리곤과 분리(v2.0).
-        width_ratios = [1.6, 0.8] + [1.0] * n_members
-        gs = self.figure.add_gridspec(1, 2 + n_members, width_ratios=width_ratios, wspace=0.6)
+        n_indiv_rows = (n_members + 1) // 2
+        total_rows = 1 + n_indiv_rows
+        
+        # 동적 높이 할당 및 tight_layout 해제 (텍스트 중첩 방지 및 비율 고정)
+        required_height = 450 + (350 * n_indiv_rows)
+        self.setMinimumHeight(required_height)
+        self.figure.set_tight_layout(False)
+        self.figure.subplots_adjust(left=0.0, right=1.0, top=0.95, bottom=0.05)
+        
+        gs = self.figure.add_gridspec(
+            total_rows, 5,
+            width_ratios=[0.5, 3.7, 1.6, 3.7, 0.5],
+            height_ratios=[1.5] + [1.0] * n_indiv_rows,
+            wspace=0.0, hspace=0.4
+        )
 
-        self.ax = self.figure.add_subplot(gs[0, 0], projection="polar")
-        self._legend_ax = self.figure.add_subplot(gs[0, 1])
+        self.ax = self.figure.add_subplot(gs[0, 1], projection="polar")
+        self._legend_ax = self.figure.add_subplot(gs[0, 3])
         self._legend_ax.axis("off")
 
         # 애니메이션 대상(종합+개인 모든 폴리곤)과 종합 폴리곤(접근자 대상)을 분리 추적.
@@ -137,7 +149,7 @@ class RadarChartWidget(BaseChartWidget):
         self._base_radii = []
 
         # --- 종합 레이더 ---
-        self._setup_polar(self.ax, tick_labels, fontsize=8)
+        self._setup_polar(self.ax, tick_labels, fontsize=T.FONT_SUBTITLE)
         self._avg_line = self._draw_team_average(self.ax)
         for m in self._scores:
             radii = self._radii_for(m)
@@ -151,32 +163,47 @@ class RadarChartWidget(BaseChartWidget):
         self._legend_ax.legend(
             handles=[ln for ln, _f in self._member_lines] + [self._avg_line],
             labels=[m[K_AUTHOR] for m in self._scores] + ["팀 평균"],
-            loc="center", fontsize=8, frameon=False,
+            loc="center", fontsize=8, frameon=False, labelcolor=T.COLOR_TEXT
         )
 
         # --- 인원별 개인 레이더 ---
         self._indiv_axes = []
         for i, m in enumerate(self._scores):
-            ax_i = self.figure.add_subplot(gs[0, 2 + i], projection="polar")
-            self._setup_polar(ax_i, tick_labels, fontsize=6)
+            row = 1 + i // 2
+            col = 1 if (i % 2 == 0) else 3
+            ax_i = self.figure.add_subplot(gs[row, col], projection="polar")
+            self._setup_polar(ax_i, tick_labels, fontsize=T.FONT_SUBTITLE)
             self._draw_team_average(ax_i, faint=True)
             radii = self._radii_for(m)
             color = self._member_lines[i][0].get_color()
             line, fill = self._add_polygon(ax_i, n_axes, color=color)
             self._anim.append((line, fill, radii))
-            ax_i.set_title(m[K_AUTHOR], fontsize=9)
+            ax_i.set_title(m[K_AUTHOR], fontsize=11)
             self._indiv_axes.append(ax_i)
+            
+        if n_members % 2 != 0:
+            row = 1 + n_members // 2
+            col = 3
+            ax_empty = self.figure.add_subplot(gs[row, col], projection="polar")
+            self._setup_polar(ax_empty, tick_labels, fontsize=T.FONT_SUBTITLE)
+            ax_empty.set_title("빈 레이더", fontsize=11)
+            self._indiv_axes.append(ax_empty)
 
-    def _setup_polar(self, ax, tick_labels: list[str], fontsize: int = 8) -> None:
-        ax.set_theta_offset(math.pi / 2)
-        ax.set_theta_direction(-1)
-        ax.set_ylim(0.0, 1.0)
-        ax.set_yticks([T.GRID_STEP * k for k in range(1, 6)])  # 0.2 간격 5단계
-        ax.set_yticklabels([])
-        ax.set_xticks(self._angles)
-        ax.set_xticklabels(tick_labels, fontsize=fontsize, color=T.COLOR_TEXT_MUTED)
-        ax.grid(color=T.COLOR_GRID)
-        self._style_axes(ax)
+    def _setup_polar(self, ax_obj, tick_labels: list[str], fontsize: int = 8) -> None:
+        ax_obj.set_theta_offset(math.pi / 2)
+        ax_obj.set_theta_direction(-1)
+        ax_obj.set_ylim(0.0, 1.0)
+        ax_obj.set_yticks([T.GRID_STEP * k for k in range(1, 6)])  # 0.2 간격 5단계
+        ax_obj.set_yticklabels([])
+        ax_obj.set_xticks(self._angles)
+        ax_obj.set_xticklabels(tick_labels)
+        ax_obj.tick_params(axis="x", labelsize=fontsize, pad=5, colors=T.COLOR_TEXT)
+        ax_obj.grid(color=T.COLOR_GRID, linestyle="-", linewidth=0.5)
+        ax_obj.spines["polar"].set_color(T.COLOR_GRID)
+        
+        for label in ax_obj.get_xticklabels():
+            label.set_in_layout(False)
+        self._style_axes(ax_obj)
 
     def _add_polygon(self, ax, n_axes: int, color=None):
         """ax에 0반경 폴리곤(line+fill)을 추가하고 반환(애니메이션으로 확장)."""

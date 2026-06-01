@@ -24,8 +24,9 @@ from qce.view.style.theme import theme_manager
 
 
 from PyQt6.QtGui import QIcon, QPixmap
+from PyQt6.QtWidgets import QHBoxLayout, QWidget, QMenu
 
-_LOGO_PATH = os.path.join(os.path.dirname(__file__), "assets", "logo.png")
+_LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "QCE_Logo.png")
 
 
 class MainWindow(QMainWindow):
@@ -34,7 +35,7 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("QCE — 부탁해 꼬마선장")
-        self.setWindowIcon(QIcon("assets/logo.png"))
+        self.setWindowIcon(QIcon(_LOGO_PATH))
         self.setStyleSheet(app_stylesheet())
 
         self.stack = QStackedWidget()
@@ -53,6 +54,11 @@ class MainWindow(QMainWindow):
 
     def _build_menu(self) -> None:
         # 모든 화면에서 항상 노출되는 좌측 상단 작은 로고 (셸 크롬, 요구사항 1)
+        left_widget = QWidget()
+        left_layout = QHBoxLayout(left_widget)
+        left_layout.setContentsMargins(12, 0, 0, 0)
+        left_layout.setSpacing(12)
+
         self.corner_logo = QLabel()
         pix = QPixmap(_LOGO_PATH)
         if not pix.isNull():
@@ -62,12 +68,20 @@ class MainWindow(QMainWindow):
         else:
             self.corner_logo.setText("QCE")
             self.corner_logo.setObjectName("cornerLogo")
-        self.menuBar().setCornerWidget(self.corner_logo, Qt.Corner.TopLeftCorner)
-
-        menu = self.menuBar().addMenu("파일")
-        self._act_save = menu.addAction("리포트 저장…")
+        left_layout.addWidget(self.corner_logo)
+        
+        self.file_btn = QToolButton()
+        self.file_btn.setText("파일")
+        self.file_btn.setObjectName("secondary")
+        self.file_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        file_menu = QMenu(self.file_btn)
+        self._act_save = file_menu.addAction("리포트 저장…")
         self._act_save.triggered.connect(self.save_report_requested.emit)
-        self._act_save.setEnabled(False)  # 초기 비활성(제출·로딩 화면)
+        self._act_save.setEnabled(False)
+        self.file_btn.setMenu(file_menu)
+        left_layout.addWidget(self.file_btn)
+
+        self.menuBar().setCornerWidget(left_widget, Qt.Corner.TopLeftCorner)
 
         # [v2.0] 우측 상단 끝 설정 버튼(코너 위젯, FR-5.8)
         self.settings_btn = QToolButton()

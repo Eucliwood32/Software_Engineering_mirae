@@ -81,6 +81,22 @@ def app_stylesheet() -> str:
         background: {T.COLOR_SURFACE_2};
         color: {T.COLOR_TEXT_DISABLED};
     }}
+    QPushButton#saveReportBtn, QPushButton#submitBtn {{
+        background: {T.COLOR_PRIMARY};
+        color: #ffffff;
+        border: none;
+        border-radius: {T.RADIUS_SM}px;
+        padding: {T.BTN_PAD_PRIMARY[0]}px {T.BTN_PAD_PRIMARY[1]}px;
+        font-size: {T.FONT_BUTTON_PRIMARY}px;
+        font-weight: 400;
+        min-height: {T.TOUCH_TARGET_MIN}px;
+    }}
+    QPushButton#saveReportBtn:hover, QPushButton#submitBtn:hover    {{ background: {T.COLOR_PRIMARY_FOCUS}; }}
+    QPushButton#saveReportBtn:pressed, QPushButton#submitBtn:pressed  {{ background: {T.COLOR_PRIMARY_FOCUS}; }}
+    QPushButton#saveReportBtn:disabled, QPushButton#submitBtn:disabled {{
+        background: {T.COLOR_SURFACE_2};
+        color: {T.COLOR_TEXT_DISABLED};
+    }}
 
     /* ── 세컨더리/유틸 버튼 (6px) ─────────────────────────── */
     QPushButton#secondary {{
@@ -212,6 +228,10 @@ def app_stylesheet() -> str:
         min-height: 28px;
     }}
     QComboBox:hover {{ border-color: {T.COLOR_PRIMARY}; }}
+    QComboBox::drop-down {{
+        border: none;
+        background: transparent;
+    }}
     QComboBox QAbstractItemView {{
         background: {T.COLOR_SURFACE};
         border: 1px solid {T.COLOR_HAIRLINE};
