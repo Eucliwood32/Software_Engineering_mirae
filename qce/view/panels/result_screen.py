@@ -8,8 +8,10 @@ merge_requested(분석-후 N:1)를 올리고, Controller가 재집계·재정규
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
+import os
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QPixmap
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from qce.view.contract import (
     K_AUTHOR,
@@ -21,6 +23,7 @@ from qce.view.dialogs.alias_mapping_dialog import AliasMappingDialog
 from qce.view.panels.dashboard_view import DashboardView
 from qce.view.panels.warning_banner import WarningBanner
 
+_LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "logo.png")
 
 class ResultScreen(QWidget):
     merge_requested = pyqtSignal(dict)            # {alias→member} 병합 그룹
@@ -38,6 +41,20 @@ class ResultScreen(QWidget):
         self.dashboard.signal_dismissed.connect(self.signal_dismissed)
 
         root = QVBoxLayout(self)
+
+        # 로고 (가운데 상단, 여백 포함 작게 표시)
+        logo = QLabel()
+        logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        logo.setContentsMargins(20, 20, 20, 20)
+        pix = QPixmap(_LOGO_PATH)
+        if not pix.isNull():
+            logo.setPixmap(pix.scaledToHeight(48, Qt.TransformationMode.SmoothTransformation))
+        else:
+            logo.setText("QCE")
+            logo.setObjectName("logoText")
+            logo.setStyleSheet("font-size: 22pt; font-weight: bold;")
+        root.addWidget(logo)
+
         root.addWidget(self.banner)
         root.addWidget(self.dashboard, stretch=1)
         root.addWidget(self.merge)

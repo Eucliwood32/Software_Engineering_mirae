@@ -60,9 +60,10 @@ class SubmitScreen(QWidget):
         # 로고 (assets/logo.png, 없으면 텍스트 폴백)
         logo = QLabel()
         logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        logo.setContentsMargins(20, 20, 20, 20)
         pix = QPixmap(_LOGO_PATH)
         if not pix.isNull():
-            logo.setPixmap(pix.scaledToHeight(96, Qt.TransformationMode.SmoothTransformation))
+            logo.setPixmap(pix.scaledToHeight(48, Qt.TransformationMode.SmoothTransformation))
         else:
             logo.setText("QCE — 부탁해 꼬마선장")
             logo.setObjectName("logoText")
