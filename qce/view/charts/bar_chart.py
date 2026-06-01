@@ -37,6 +37,7 @@ class BarChartWidget(BaseChartWidget):
         self.ax.set_xticklabels(authors)
         self.ax.yaxis.set_major_locator(MultipleLocator(T.GRID_STEP))  # 그리드 0.2
         self.ax.grid(axis="y", color=T.COLOR_GRID, linewidth=0.6, zorder=0)
+        self._style_axes(self.ax)               # [v2.0] 라이트/다크 축 채색
 
         # 1위 강조색 + 나머지 기본색
         top_idx = max(xs, key=lambda i: totals[i]) if totals else -1
@@ -69,7 +70,7 @@ class BarChartWidget(BaseChartWidget):
             t = self.ax.text(
                 bar.get_x() + bar.get_width() / 2, h + 0.01,
                 f"{float(m[K_TOTAL]):.2f}",
-                ha="center", va="bottom", fontsize=9,
+                ha="center", va="bottom", fontsize=9, color=T.COLOR_TEXT,
             )
             self._value_texts.append(t)
 

@@ -39,6 +39,7 @@ class ScatterChartWidget(BaseChartWidget):
         self.ax.set_ylim(0.0, 1.0)
         self.ax.set_xlabel("Git 점수")
         self.ax.set_ylabel("문서 점수")
+        self._style_axes(self.ax)               # [v2.0] 라이트/다크 축 채색
 
         gits = [float(m[K_GIT]) for m in self._scores]
         docs = [float(m[K_DOC]) for m in self._scores]
@@ -134,7 +135,7 @@ class ScatterChartWidget(BaseChartWidget):
         self._name_texts = []
         for (px, py), m in zip(self._label_positions, self._scores):
             dx, dy = inv.transform((px, py))
-            t = self.ax.text(dx, dy, m[K_AUTHOR], fontsize=8, zorder=4)
+            t = self.ax.text(dx, dy, m[K_AUTHOR], fontsize=8, zorder=4, color=T.COLOR_TEXT)
             self._name_texts.append(t)
 
     def _draw_frame(self, progress: float) -> None:

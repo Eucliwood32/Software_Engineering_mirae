@@ -18,6 +18,7 @@ from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
 from qce.view.style import tokens as T
+from qce.view.style.theme import theme_manager
 
 # 한글 폰트·음수 부호 깨짐 방지 (view-design §10, C-5)
 matplotlib.rcParams["font.family"] = T.FONT_FAMILY
@@ -50,6 +51,10 @@ class BaseChartWidget(QWidget):
         self._progress = 0.0
         self._animating = False                  # True 동안 hover 비활성 (INV-V5)
 
+        # [v2.0] 테마 변경 구독 — 라이트/다크 전환 시 재채색·정적 재렌더(§7.1)
+        theme_manager.changed.connect(self._on_theme_changed)
+
+        self._apply_canvas_theme()
         self.show_placeholder()
 
     # ------------------------------------------------------------------ #
@@ -67,7 +72,9 @@ class BaseChartWidget(QWidget):
 
     def show_placeholder(self) -> None:
         """축 숨기고 중앙에 안내 문구."""
+        self._apply_canvas_theme()
         self.ax.clear()
+        self.ax.set_facecolor(T.COLOR_SURFACE)
         self.ax.set_axis_off()
         self.ax.text(
             0.5, 0.5, PLACEHOLDER_TEXT,
@@ -75,6 +82,35 @@ class BaseChartWidget(QWidget):
             transform=self.ax.transAxes,
         )
         self.canvas.draw_idle()
+
+    # ------------------------------------------------------------------ #
+    # 테마 (v2.0, view-design §7.1·§10.2)
+    # ------------------------------------------------------------------ #
+    def _apply_canvas_theme(self) -> None:
+        """figure 배경을 활성 팔레트 배경색으로 맞춘다."""
+        self.figure.set_facecolor(T.COLOR_BG)
+
+    def _style_axes(self, ax) -> None:
+        """축 facecolor·tick·label·spine·title 색을 활성 팔레트에서 읽어 적용.
+        직교/극좌표 양쪽에서 동작하도록 spine 처리를 방어적으로 감싼다."""
+        ax.set_facecolor(T.COLOR_SURFACE)
+        ax.tick_params(colors=T.COLOR_TEXT)
+        ax.xaxis.label.set_color(T.COLOR_TEXT)
+        ax.yaxis.label.set_color(T.COLOR_TEXT)
+        ax.title.set_color(T.COLOR_TEXT)
+        for spine in ax.spines.values():
+            spine.set_color(T.COLOR_GRID)
+
+    def _on_theme_changed(self) -> None:
+        """테마 전환 시 재채색 후 보유 scores로 애니메이션 없이 최종 상태 재렌더."""
+        self._apply_canvas_theme()
+        if self._scores:
+            self._render_static()
+            self._draw_frame(1.0)
+            self._progress = 1.0
+            self.canvas.draw_idle()
+        else:
+            self.show_placeholder()
 
     def clear(self) -> None:
         self._scores = []

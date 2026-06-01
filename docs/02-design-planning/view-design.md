@@ -3,8 +3,8 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 문서 버전 | v1.7 |
-| 작성일 | 2026-06-01 |
+| 문서 버전 | v2.0 |
+| 작성일 | 2026-06-02 |
 | 준수 표준 | ISO/IEC/IEEE 29148-2018, ISO/IEC/IEEE 42010 (아키텍처 기술) |
 | 상위 문서 | architecture-overview.md v1.3, Requirements Record v1.5, Concept of Operations v1.3, Development Constraints v2.0 |
 | 관련 ADR | ADR-0001(MVC), ADR-0002(PyQt6) |
@@ -85,11 +85,13 @@ qce/
     ├── assets/
     │   └── logo.png                # 메인 화면 로고 (FR-5.5, PyInstaller 번들 포함)
     ├── style/
-    │   ├── tokens.py               # 색상·폰트·치수 토큰
+    │   ├── tokens.py               # 색상·폰트·치수 토큰 (라이트/다크 팔레트, v2.0)
+    │   ├── theme.py                # ThemeManager (시스템 연동·라이트/다크 전환, v2.0)
     │   └── qss.py                  # QSS 스타일시트 문자열
     ├── dialogs/
     │   ├── git_missing_dialog.py   # GitMissingDialog
     │   ├── alias_mapping_dialog.py # AliasMappingDialog (v1.3: 결과 화면 병합 컨트롤로 용도 변경, FR-5.7)
+    │   ├── settings_dialog.py      # SettingsDialog (다크모드 스위치·Staff Credit, v2.0)
     │   └── save_report_dialog.py   # SaveReportDialog
     ├── panels/
     │   ├── submit_screen.py        # SubmitScreen (메인/제출 화면, FR-5.5)
@@ -117,6 +119,7 @@ qce/
 | `panels/result_screen.py` | ResultScreen (DashboardView+병합 컨트롤+새 분석) | FR-5.7 | ~130 |
 | `dialogs/git_missing_dialog.py` | GitMissingDialog | FR-2.2 | ~70 |
 | `dialogs/alias_mapping_dialog.py` | AliasMappingDialog (N:1 매핑·미매핑 경고) | FR-1.3 | ~230 |
+| `dialogs/settings_dialog.py` | SettingsDialog (다크모드 스위치·Staff Credit) | FR-5.8 | ~120 |
 | `dialogs/save_report_dialog.py` | SaveReportDialog | FR-5.2 | ~80 |
 | `panels/analysis_panel.py` | AnalysisPanel (프리셋·슬라이더·합계검증) | FR-4.4 | ~270 |
 | `panels/dashboard_view.py` | DashboardView (3차트 컨테이너·차트간 Signal 중재·신호 목록) | FR-5.1 | ~150 |
@@ -126,9 +129,10 @@ qce/
 | `charts/bar_chart.py` | BarChartWidget | FR-5.1a | ~270 |
 | `charts/radar_chart.py` | RadarChartWidget | FR-5.1b | ~340 |
 | `charts/scatter_chart.py` | ScatterChartWidget | FR-5.1c | ~390 |
-| `style/tokens.py` | 색상·폰트·치수 토큰 | C-5 | ~50 |
+| `style/tokens.py` | 색상·폰트·치수 토큰 (라이트/다크 팔레트) | C-5 | ~110 |
+| `style/theme.py` | ThemeManager (시스템 연동·라이트/다크 전환) | FR-5.8 | ~90 |
 | `style/qss.py` | QSS 스타일시트 | C-5 | ~60 |
-| **View 합계** | | | **~2,530** |
+| **View 합계** | | | **~2,800** |
 
 > **분량 관찰.** 차트 4파일(Base+3종)이 **~1,190줄로 전체의 약 47%**를 차지한다. FR-5.1a/b/c가 각각 툴팁 항목 수·진입 애니메이션(20프레임/30ms)·평균선/십자선·라벨 겹침 해소·클릭 연동까지 수용기준을 10~15개씩 달고 있어 자연스럽게 무거워진다. 목표 분량 ~2,500줄은 사실상 차트 인터랙션 요구가 결정한다. 분량을 줄이려면 차트 인터랙션을, 늘리려면 같은 곳을 조정한다.
 
@@ -292,8 +296,10 @@ SRC_GIT, SRC_DOC, SRC_MSG = "git", "doc", "messenger"
 
 각 컴포넌트의 책임·공개 인터페이스·핵심 내부 메서드를 정의한다. 시그니처는 Python 3.10+ 타입 힌트(C-5)로 표기하며, 복합 입력은 dict 기반이다(결정 A).
 
-### 6.1 MainWindow `main_window.py` (~220) — FR-5.4
+### 6.1 MainWindow `main_window.py` (~220) — FR-5.4 / FR-5.8
 앱 셸. `QStackedWidget`으로 **제출(SubmitScreen) → 로딩(LoadingScreen) → 결과(ResultScreen)** 3화면을 보유하고 전환한다(FR-5.4). 상단 메뉴(리포트 저장 등)·하단 상태바를 레이아웃하고, GitMissingDialog·SaveReportDialog를 셸 모달로 합성한다. 화면 전환 슬롯(`show_submit`/`show_loading`/`show_result`)은 Controller가 상태 전이에 맞춰 호출한다(§8). 입력 Drag&Drop은 제출 화면(SubmitScreen)이 담당하므로 MainWindow는 더 이상 드롭 분기 로직을 갖지 않는다.
+
+**[v2.0 설정 버튼·테마] (FR-5.8).** 메뉴바 **우측 상단 끝**에 톱니바퀴(⚙) 설정 버튼을 `menuBar().setCornerWidget(...)`로 고정 배치한다(어느 화면에서도 항상 노출). 클릭하면 `SettingsDialog`(§6.13)를 버튼 근처 팝업으로 띄운다. 다크/라이트 테마 자체는 `style.theme.theme_manager`(전역 ThemeManager, §10)가 소유하며, MainWindow는 `theme_manager.changed` 신호를 받아 `setStyleSheet(app_stylesheet())`로 앱 전역 QSS를 다시 적용한다. 차트의 재채색은 각 차트가 같은 신호를 직접 구독해 처리한다(§7.1). MainWindow는 테마 상태를 보유하지 않고 표시만 갱신한다(INV-V1 — theme_manager는 `qce.view.*` 내부 모듈).
 
 ```python
 class MainWindow(QMainWindow):
@@ -305,7 +311,12 @@ class MainWindow(QMainWindow):
         self.loading = LoadingScreen()     # 진행률
         self.result = ResultScreen()       # 대시보드 + 병합 + [새 분석]
         # stack.addWidget(...) ×3
+        self.settings_btn = QToolButton()  # ⚙ — 우측 상단 코너 위젯(FR-5.8)
+        self.menuBar().setCornerWidget(self.settings_btn, Qt.Corner.TopRightCorner)
+        theme_manager.changed.connect(self._reapply_theme)   # 테마 변경 → QSS 재적용
 
+    def _open_settings(self) -> None: ...  # SettingsDialog 팝업
+    def _reapply_theme(self) -> None:      # setStyleSheet(app_stylesheet())
     def flash_status(self, msg: str, msec: int = 3000) -> None: ...  # FR-5.2/NFR-2.4
     def show_submit(self)  -> None: ...    # stack 전환 (FR-5.4)
     def show_loading(self) -> None: ...
@@ -386,6 +397,8 @@ class AnalysisPanel(QWidget):
 
 ### 6.6 DashboardView `dashboard_view.py` (~150) — FR-5.1
 세 차트의 컨테이너이자 **차트간 Signal 중재자**(결정 B). 신호는 (1) 가벼운 한 줄 요약 라벨과 (2) **카드 패널 `AnomalySignalPanel`(§6.12, FR-4.2/4.2b/4.2d 표시·4.2c 예외)** 두 가지로 표시한다. 카드의 "정상으로 표시"는 직접 처리하지 않고 `signal_dismissed`로 상위에 중계만 한다(INV-V1). 입력은 점수 dict 목록이다(§5.3).
+
+> **[v2.0] 차트 배치(산점도↔레이더 교체).** 상단 행은 `[막대 차트 | 산점도]`를 좌우로 두고, **레이더 차트는 하단 행 전체 폭**을 차지한다. 종전(v1.x)에는 레이더가 상단 우측, 산점도가 하단 전체 폭이었으나, §7.3 v2.0에서 레이더가 종합+개인 병렬 배치로 가로 폭을 더 요구하므로 둘의 위치를 맞바꾼다. QGridLayout 기준: `bar(0,0)`, `scatter(0,1)`, `radar(1,0,1,2)`(2열 span).
 
 ```python
 class DashboardView(QWidget):
@@ -506,6 +519,28 @@ class AnomalySignalPanel(QWidget):
 ```
 > **배선 경로(FR-4.2c).** `_SignalCard.dismissed` → `AnomalySignalPanel.signal_dismissed` → `DashboardView.signal_dismissed`(§6.6) → `ResultScreen.signal_dismissed`(§6.11) → `AppController`가 `NormalizedSignalsTracker.dismiss()` 후 예외 반영분으로 결과를 재렌더(재집계 없음). 상세는 model-business-logic-design §2.10·controller-design 참조.
 
+### 6.13 SettingsDialog `settings_dialog.py` (~120) — FR-5.8
+설정 팝업 다이얼로그. MainWindow의 우측 상단 ⚙ 버튼이 띄운다(§6.1). 두 가지 내용을 담는다.
+
+1. **다크 모드 스위치.** 다크/라이트를 토글하는 스위치(`QCheckBox`)다. 기본값은 **시스템 설정 자동 추종**(Windows 라이트/다크)이며, 스위치를 조작하면 사용자 명시 선택(라이트/다크)으로 전환된다. 토글 시 위젯은 **테마 상태를 직접 바꾸지 않고** `theme_manager`(§10)에 위임한다 — `theme_manager.set_dark(on)`을 호출하면 ThemeManager가 팔레트 적용 후 `changed`를 발행하고, MainWindow·차트가 이를 받아 재채색한다. 다이얼로그는 표시될 때 `theme_manager.is_dark()`로 스위치 상태를 동기화한다.
+2. **Staff Credit.** 화면 하단에 QCE 개발팀 3인을 명시한다 — **이대한(20247142, View)·조원희(20222047)·김휘중(20221985)**. 표시 전용 라벨이며 상호작용은 없다(공간 활용·기여자 명시 목적).
+
+```python
+class SettingsDialog(QDialog):
+    STAFF = [("이대한", "20247142"), ("조원희", "20222047"), ("김휘중", "20221985")]
+
+    def __init__(self, parent=None) -> None:
+        self._dark_switch = QCheckBox("다크 모드")
+        self._dark_switch.setChecked(theme_manager.is_dark())   # 현재 테마와 동기화
+        self._dark_switch.toggled.connect(theme_manager.set_dark)
+        # ... Staff Credit 라벨 그룹 ...
+
+    # --- 테스트 접근자 ---
+    def is_dark_checked(self) -> bool: ...
+    def staff_names(self) -> list[str]: ...
+```
+수용기준 대응(FR-5.8): 우측 상단 설정 버튼 → 팝업, 다크/라이트 스위치(시스템 자동 + 수동 오버라이드), 토글 즉시 전역 재채색, Staff Credit 3인 표기. 테마 전환·시스템 감지 로직은 본 다이얼로그가 아니라 `theme_manager`가 소유한다(단일 출처).
+
 ---
 
 ## 7. 차트 상세 설계
@@ -550,6 +585,8 @@ class BaseChartWidget(QWidget):
         return self._animating
 ```
 
+> **[v2.0] 테마 연동.** BaseChartWidget은 `theme_manager.changed`(§10.2)를 구독한다. 신호 수신 시 `_apply_canvas_theme()`로 figure facecolor를 `tokens.COLOR_BG`로 맞추고, 보유한 `_scores`가 있으면 `_render_static()` 후 `_draw_frame(1.0)`으로 **애니메이션 없이 최종 상태로 즉시 재렌더**한다(scores가 없으면 placeholder 재표시). 정적 요소를 그리는 하위 클래스(`_render_static`)는 축 facecolor·tick·label·spine 색을 토큰에서 읽어 라이트/다크 양쪽에서 가독성을 유지한다. 공통 축 채색은 base의 `_style_axes(ax)` 헬퍼가 담당한다.
+
 > **애니메이션 스레드 모델(결정 D).** 진입 애니메이션은 **메인 스레드 `QTimer`**가 30ms마다 `_on_anim_tick`을 호출해 20프레임을 구동한다. Worker는 관여하지 않는다. 무거운 분석이 끝났다는 `completed` Signal을 Controller가 받아 `DashboardView.render`를 호출하면, 각 차트가 데이터를 세팅하고 `_start_animation`을 켠다. 애니메이션 중에도 메인 이벤트 루프는 살아 있어 창 드래그가 가능하다(NFR-1.1). 애니메이션 진행 중 hover 이벤트는 끊고(INV-V5), 종료 틱에서 다시 연결한다.
 
 ### 7.2 BarChartWidget `bar_chart.py` (~270) — FR-5.1a
@@ -570,31 +607,46 @@ class BarChartWidget(BaseChartWidget):
     def tooltip_fields(self, author: str) -> list[str]: ...  # test_bar_tooltip_items (len==6)
 ```
 
-### 7.3 RadarChartWidget `radar_chart.py` (~340) — FR-5.1b
-**[v1.7] 가변 세부 축 레이더.** 종전에는 Git/문서/메신저 3축(소스당 1축)이었으나, 소스가 1개뿐이면 축이 1~2개만 그려져 레이더 폴리곤이 성립하지 않는 문제가 있었다. 이제 **가용 소스마다 3개의 세부 지표 축**을 그려, 소스 1·2·3개에 각각 **3·6·9축** 레이더가 항상 정상적으로 그려지도록 한다. 세부 축 점수는 점수 dict의 `dimensions`(§5.3)에서 읽으며, 표시 순서·라벨은 `contract.DIM_AXES`를 단일 출처로 사용한다. 결측 소스는 축 자체가 생성되지 않는다(종전 "(제외됨)" 표기 대신 축 미생성). 팀원 N개 + 팀 평균 1개 = (N+1) 폴리곤, 동심원 0.2×5, 범례 토글, 4항목 툴팁, 중심→최종 확장 애니메이션, 산점도 클릭 1.5초 하이라이트(결정 B)는 유지된다.
+### 7.3 RadarChartWidget `radar_chart.py` (~420) — FR-5.1b
+**[v1.7] 가변 세부 축 레이더.** 종전에는 Git/문서/메신저 3축(소스당 1축)이었으나, 소스가 1개뿐이면 축이 1~2개만 그려져 레이더 폴리곤이 성립하지 않는 문제가 있었다. 이제 **가용 소스마다 3개의 세부 지표 축**을 그려, 소스 1·2·3개에 각각 **3·6·9축** 레이더가 항상 정상적으로 그려지도록 한다. 세부 축 점수는 점수 dict의 `dimensions`(§5.3)에서 읽으며, 표시 순서·라벨은 `contract.DIM_AXES`를 단일 출처로 사용한다. 결측 소스는 축 자체가 생성되지 않는다(종전 "(제외됨)" 표기 대신 축 미생성). 동심원 0.2×5, 범례 토글, 4항목 툴팁, 중심→최종 확장 애니메이션, 산점도 클릭 1.5초 하이라이트(결정 B)는 유지된다.
 
-> **폴백.** 점수 dict에 `dimensions`가 없거나 비어 있으면(레거시 fixture·`dimensions={}`) 종전 동작인 **고정 3축(Git/문서/메신저)** + 결측 축 "(제외됨)" 표기로 폴백한다. 따라서 실제 앱(Controller가 `dimensions` 산출)은 가변 세부 축으로, 차원 정보 없는 합성 데이터는 레거시 3축으로 동작한다.
+**[v2.0] 축 소스 명시·범례 분리·종합+개인 병렬 배치.** 사용자 피드백을 반영해 세 가지를 개정한다.
+
+1. **축의 소스 명시(FR-5.1b).** 각 세부 축이 **Git·문서·메신저 중 어디에 속하는지**를 축 눈금 라벨에 함께 표기한다. 표시 라벨은 2줄로 `"{소스}\n{세부지표}"`(예: `"Git\n커밋 수"`, `"문서\n문서 분량"`, `"메신저\n발화 수"`)로 구성한다. 소스 표시명은 `Git`/`문서`/`메신저`다. 단, 테스트 계약인 `axis_labels` 접근자는 **소스 접두 없는 순수 라벨**(예: `["커밋 수", …]`)을 그대로 반환한다(렌더 눈금 라벨과 별개; §11 회귀 보존).
+2. **범례를 그래프와 분리해 수평 배치.** 종전 범례가 폴리곤 위에 겹치던 문제를 해소하기 위해, 종합 레이더와 범례를 **GridSpec 별도 열**로 나눠 사이에 여백을 두고 수평으로 나란히 배치한다. 범례는 축이 꺼진 전용 axes(`_legend_ax`)에 그려 폴리곤과 절대 겹치지 않는다.
+3. **종합 그래프 + 인원별 개인 그래프 병렬.** 한 figure 안에 **종합 레이더(전체 팀원 + 팀 평균 오버레이)**와 **팀원 1인당 개인 레이더**(해당 팀원 폴리곤 + 팀 평균 옅은 점선)를 한 행으로 나란히 배치한다. 레이아웃은 `[종합 | 범례 | 개인1 | 개인2 | …]`(GridSpec 1행, `width_ratios`로 종합을 넓게, 범례 열에 여백 확보). 개인 레이더는 제목으로 팀원명을 가진다. 개인 레이더는 범례가 불필요하므로(제목으로 식별) 종합에만 범례를 둔다.
+
+> **테스트 표면 보존.** 차트간 연동·토글·결측 접근자는 **종합 레이더의 폴리곤**을 대상으로 유지한다. 즉 `_member_lines`(=`is_polygon_visible`·`member_linewidth`·`toggle_member`·`highlight_member`가 다루는 라인)는 종합 레이더의 (N+1) 폴리곤을 가리킨다. 개인 레이더의 폴리곤은 애니메이션 대상이되 접근자 인덱스에는 포함되지 않는다. 따라서 §11의 기존 12 pytest와 §6.6 중재 테스트는 회귀 없이 통과한다.
+
+> **폴백.** 점수 dict에 `dimensions`가 없거나 비어 있으면(레거시 fixture·`dimensions={}`) 종전 동작인 **고정 3축(Git/문서/메신저)** + 결측 축 "(제외됨)" 표기로 폴백한다. 폴백 시 축 라벨은 이미 소스명 자체이므로 2줄 접두를 추가하지 않는다. 따라서 실제 앱(Controller가 `dimensions` 산출)은 가변 세부 축으로, 차원 정보 없는 합성 데이터는 레거시 3축으로 동작한다.
 
 ```python
 class RadarChartWidget(BaseChartWidget):
     AXIS_LABELS = ["Git", "문서", "메신저"]   # 폴백(레거시) 기본 축
+    SRC_DISPLAY = {SRC_GIT: "Git", SRC_DOC: "문서", SRC_MSG: "메신저"}  # 축 소스 접두
     def render(self, scores: list[dict], missing: set[str]) -> None: ...
     def _resolve_axes(self) -> list[tuple[str, str]] | None:
         """[v1.7] dimensions가 있으면 가용 소스별 (축 키, 라벨) 목록(3/6/9개)을 DIM_AXES
         순서로 구성, 없으면 None(레거시 3축 폴백)."""
+    def _render_static(self) -> None:
+        """[v2.0] figure.clear 후 GridSpec [종합 | 범례 | 개인×N] 구성. 종합 ax(self.ax)에
+        (N+1) 폴리곤 + 팀 평균, 범례 ax에 분리 범례, 개인 ax마다 1인 폴리곤+팀평균."""
+    def _draw_one_radar(self, ax, members, ...) -> list:
+        """주어진 ax에 폴리곤을 그리고 (line, fill, radii) 목록을 반환(애니 대상 누적)."""
     def _draw_frame(self, progress: float) -> None:
-        """각 꼭짓점 반경 = score * progress, 팀원 i는 50ms*i 딜레이 후 등장."""
-    def _draw_team_average(self) -> None: ...
+        """종합·개인 모든 폴리곤 반경 = score * progress."""
+    def _axis_tick_labels(self, axes, missing) -> list[str]:
+        """[v2.0] 동적 모드는 '{소스}\n{라벨}', 레거시는 결측 축 '(제외됨)' 표기."""
     def toggle_member(self, index: int) -> None:
-        """범례 클릭 슬롯. 해당 폴리곤 visible 토글. 재분석 시 초기화."""
+        """범례 클릭 슬롯. 종합 레이더 해당 폴리곤 visible 토글. 재분석 시 초기화."""
     def highlight_member(self, author: str) -> None:        # scatter 연동 슬롯 (INV-V4)
-        """굵기 2배로 1.5초 강조 후 QTimer로 원복."""
+        """종합 레이더 폴리곤 굵기 2배로 1.5초 강조 후 QTimer로 원복."""
     def _build_tooltip(self, m: dict, axis: str) -> str:
         """4항목: 팀원명 / 지표명 / 정규화 점수 / 원시값."""
     # --- 테스트 접근자 ---
     @property
-    def axis_labels(self) -> list[str]: ...                 # 가변 세부 축 라벨(폴백 시 3축). test_radar_vertex_labels
-    def is_polygon_visible(self, index: int) -> bool: ...    # test_radar_toggle_hide
+    def axis_labels(self) -> list[str]: ...                 # 순수 세부 축 라벨(폴백 시 3축). test_radar_vertex_labels
+    def is_polygon_visible(self, index: int) -> bool: ...    # 종합 레이더 기준. test_radar_toggle_hide
     @property
     def excluded_axis_labels(self) -> list[str]: ...         # 레거시 폴백 결측 축("(제외됨)"). test_radar_missing_data
 ```
@@ -687,22 +739,66 @@ architecture-overview §6 동시성 모델의 View 측 규약을 구체화한다
 
 ---
 
-## 10. 스타일·리소스 토큰
+## 10. 스타일·리소스 토큰·테마 (FR-5.8)
 
 색상·폰트·치수를 `style/tokens.py`에 단일 출처로 두고, QSS 문자열은 `style/qss.py`가 토큰을 보간해 생성한다. matplotlib 차트 색상도 동일 토큰을 참조해 UI와 일관성을 유지한다.
 
+### 10.1 라이트/다크 팔레트 (v2.0)
+
+`tokens.py`는 색상명을 **모듈 전역 상수**로 노출하되, 그 값은 활성 팔레트(라이트/다크)에 따라 바뀐다. 두 팔레트를 dict(`_LIGHT`·`_DARK`)로 정의하고, `apply_palette(dark: bool)`가 활성 팔레트의 값으로 모듈 전역을 **재바인딩**한다. 차트·QSS는 모두 `tokens.COLOR_X`처럼 **속성 접근**으로 읽으므로(import-time 캡처가 아님), 재바인딩 직후 다음 렌더·QSS 생성에 새 색이 반영된다. 치수·폰트(`GRID_STEP`·`FONT_FAMILY` 등)는 테마 무관 상수다.
+
 ```python
-# style/tokens.py (발췌)
-COLOR_PRIMARY      = "#4285f4"   # 1위 강조 막대 등
-COLOR_BAR_DEFAULT  = "#9aa0a6"
-COLOR_AVG_LINE     = "#5f6368"   # 평균선·십자선
-COLOR_WARNING_BG   = "#fff8e1"   # WarningBanner 노란 배경
-COLOR_ANOMALY      = "#d93025"   # 하위 이상치 점 (FR-5.1c)
-QUADRANT_COLORS    = {"올라운더": "#e6f4ea", "개발 집중": "#e8f0fe",
-                      "문서 집중": "#fef0e3", "저참여": "#f1f3f4"}
-FONT_FAMILY        = "Malgun Gothic"   # Windows 한글(C-5)
-GRID_STEP          = 0.2
+# style/tokens.py (발췌) — 테마 가변 색상은 팔레트로 분리
+_LIGHT = {
+    "COLOR_BG": "#ffffff", "COLOR_SURFACE": "#ffffff", "COLOR_TEXT": "#202124",
+    "COLOR_MUTED": "#80868b", "COLOR_GRID": "#dadce0",
+    "COLOR_PRIMARY": "#4285f4", "COLOR_BAR_DEFAULT": "#9aa0a6",
+    "COLOR_AVG_LINE": "#5f6368", "COLOR_WARNING_BG": "#fff8e1",
+    "COLOR_WARNING_FG": "#5f4300", "COLOR_ANOMALY": "#d93025",
+    "QUADRANT_COLORS": {"올라운더": "#e6f4ea", "개발 집중": "#e8f0fe",
+                        "문서 집중": "#fef0e3", "저참여": "#f1f3f4"},
+}
+_DARK = {
+    "COLOR_BG": "#1e1e1e", "COLOR_SURFACE": "#2b2b2b", "COLOR_TEXT": "#e8eaed",
+    "COLOR_MUTED": "#9aa0a6", "COLOR_GRID": "#3c4043",
+    "COLOR_PRIMARY": "#8ab4f8", "COLOR_BAR_DEFAULT": "#5f6368",
+    "COLOR_AVG_LINE": "#9aa0a6", "COLOR_WARNING_BG": "#3a3320",
+    "COLOR_WARNING_FG": "#ffe082", "COLOR_ANOMALY": "#f28b82",
+    "QUADRANT_COLORS": {"올라운더": "#1e3325", "개발 집중": "#1f2a3d",
+                        "문서 집중": "#3a2e1e", "저참여": "#2a2c2e"},
+}
+FONT_FAMILY = "Malgun Gothic"   # Windows 한글(C-5) — 테마 무관
+GRID_STEP   = 0.2
+
+def apply_palette(dark: bool) -> None:
+    """활성 팔레트 값으로 모듈 전역 색상 상수를 재바인딩한다."""
+    globals().update(_DARK if dark else _LIGHT)
+
+apply_palette(False)            # import 시 라이트 기본값
 ```
+
+### 10.2 ThemeManager `style/theme.py` (FR-5.8)
+
+테마 상태(`auto`/`light`/`dark`)의 **단일 소유자**. 전역 싱글턴 `theme_manager`로 노출되며, `qce.view.*` 어디서든 import 가능하다(INV-V1 — 내부 View 모듈). `auto`일 때 시스템 라이트/다크는 `QApplication.styleHints().colorScheme()`로 감지하고, 시스템 변경(`colorSchemeChanged`)을 받아 `auto` 상태면 자동 재적용한다.
+
+```python
+class ThemeManager(QObject):
+    changed = pyqtSignal()                      # 팔레트 적용 완료 통지
+    def mode(self) -> str: ...                  # "auto" | "light" | "dark"
+    def is_dark(self) -> bool:                  # auto면 시스템 감지, 아니면 명시값
+        ...
+    def set_dark(self, on: bool) -> None:       # 스위치 토글 → "light"/"dark" 고정
+        ...
+    def set_mode(self, mode: str) -> None: ...  # auto 포함 명시 설정
+    def apply(self) -> None:
+        """tokens.apply_palette(is_dark) + 앱 QPalette 적용 후 changed 발행."""
+
+theme_manager = ThemeManager()                  # 모듈 싱글턴
+```
+
+> **전환 파이프라인.** `set_dark(True)` → `apply()` → ① `tokens.apply_palette(True)` ② Fusion 스타일용 다크 `QPalette`를 `QApplication`에 설정(메뉴·다이얼로그 등 네이티브 위젯 채색) ③ `changed` 발행. 구독자: **MainWindow**(앱 QSS 재적용, §6.1), **각 차트**(figure/axes facecolor·tick·label 재채색 후 보유 scores로 정적 재렌더, §7.1). 차트는 재렌더 시 애니메이션을 다시 재생하지 않고 최종 상태(progress=1.0)로 즉시 그린다.
+
+> **앱 기동 시 자동 적용.** `main()`은 `QApplication` 생성 직후 `theme_manager.apply()`를 1회 호출해 시스템 테마(`auto`)를 반영한 뒤 창을 표시한다. 따라서 별도 설정 없이도 Windows 다크 모드 사용자는 다크 UI로 시작한다.
 
 > **한글 폰트.** matplotlib 기본 폰트는 한글 깨짐이 발생하므로 차트 생성 시 `Malgun Gothic`을 명시 설정한다(Windows 10/11 기본 탑재, C-5). 음수 부호 깨짐 방지를 위해 `axes.unicode_minus=False`를 설정한다.
 
@@ -741,6 +837,7 @@ GRID_STEP          = 0.2
 | ResultScreen | FR-5.7 (계정 병합·재집계) | C-4 | 수동+pytest |
 | GitMissingDialog | FR-2.2 | C-2, C-9 | 수동 |
 | AliasMappingDialog | FR-1.3 / FR-5.7 (결과 병합 재사용) | C-4 | 수동+pytest |
+| SettingsDialog | FR-5.8 (다크모드 스위치·Staff Credit) | C-4 | 수동+pytest |
 | SaveReportDialog | FR-5.2 | C-4 | 수동 |
 | AnalysisPanel | FR-4.4 | C-4 | 수동 |
 | DashboardView | FR-5.1 | C-4 (Signal 중재, INV-V4) | 수동+pytest |
@@ -752,7 +849,8 @@ GRID_STEP          = 0.2
 | RadarChartWidget | FR-5.1b | C-5 | FR-5.1d (3건) |
 | ScatterChartWidget | FR-5.1c | C-5 | FR-5.1d (6건) |
 | contract.py | (격리 지원) | INV-V1 | 정적분석 |
-| style/tokens·qss | (일관성) | C-5 | — |
+| style/tokens·qss | (일관성·라이트/다크 팔레트) | C-5 | — |
+| style/theme (ThemeManager) | FR-5.8 (시스템 연동·테마 전환) | C-4 (INV-V1 내부 모듈) | 수동+pytest |
 | 전 View 모듈 | — | C-4 (INV-V1·V2), NFR-1.1 (INV-V3) | import 그래프 정적분석 |
 
 > **MVC 불변식 검증 포인트.** 정적 분석에서 `grep -rE "from qce\.(model|controller|common)" view/`가 **0건**이어야 한다(INV-V1·V2 Fail 조건). 차트 3종 상호 import도 0건이어야 한다(INV-V4). View는 `PyQt6`·`matplotlib`·`qce.view.*`에만 의존한다.
@@ -773,3 +871,4 @@ GRID_STEP          = 0.2
 | v1.8 | 2026-06-01 | 사용자 피드백(산점도 사분면 고정) 반영: §7.4 ScatterChartWidget 사분면 기준점을 팀원 평균(가변)에서 **항상 (0.5, 0.5) 정규화 중점**으로 고정. 이로써 4개 사분면이 항상 동일한 면적(0.25×0.25)을 유지하며, 앱 화면 비율과 무관하게 일관된 시각 분석이 가능. 십자선 위치 고정, `crosshair_xy` 항상 (0.5, 0.5) 반환. | QCE 개발팀 |
 | v1.7 | 2026-06-01 | 사용자 피드백(레이더 세부 축) 반영: §7.3 RadarChartWidget을 **가용 소스별 3 세부 축**(소스 1·2·3개 → 3·6·9축)으로 개정, 단일 소스에서도 폴리곤이 정상 형성되도록 함. (1) §5.3 점수 dict에 `dimensions: dict[str,float]` 키 및 소스별 세부 지표 정의 추가(Git=커밋수/추가/정리, 문서=분량/문서수/구성요소, 메신저=발화수/발화량/시간대). (2) contract 스니펫에 `K_DIMENSIONS`·`DIM_AXES`·`DIM_SOURCE_ORDER` 추가. (3) §7.3 가변 축 렌더 + `dimensions` 부재 시 레거시 3축 폴백 명시, `_resolve_axes` 접근자 추가. 세부 축은 표시 전용으로 `total_score` 비반영(STR-7 유지). Model 측 산출은 model-business-logic-design v1.4 §2.7 참조. | QCE 개발팀 |
 | **v1.7** | **2026-06-01** | **사용자 피드백(슬라이더 비례 분배·표기 개선) 반영: (1) §6.5 AnalysisPanel 슬라이더 범위 표기를 0.00~1.00에서 0%~100%(step 5%)로 변경. (2) 합계 라벨·경고 문구를 퍼센트 단위(`"합계: 100%"`, `"가중치 합계가 100%여야 합니다"`)로 변경. (3) 슬라이더 비례 재분배 동작 설명에 "나머지 슬라이더들이 기존 비율을 유지하며 같은 비율로 자동 조절" 명시.** | QCE 개발팀 |
+| **v2.0** | **2026-06-02** | **사용자 피드백(다크모드·레이더 개편·차트 배치) 반영. (1) **다크 모드(FR-5.8)**: §3에 `style/theme.py`·`dialogs/settings_dialog.py` 추가 및 LOC 표·합계(~2,800) 갱신, §6.1 MainWindow에 우측 상단 ⚙ 설정 버튼(코너 위젯)·`theme_manager.changed` 구독 추가, **§6.13 SettingsDialog 신설**(다크모드 스위치=시스템 자동+수동 오버라이드, Staff Credit 3인), §10을 라이트/다크 팔레트·`apply_palette`·`ThemeManager`(시스템 `colorScheme` 감지·전환 파이프라인·기동 시 자동 적용)로 전면 보강, §7.1에 차트 테마 구독·`_style_axes` 추가, §12 RTM에 SettingsDialog·theme 행 추가. (2) **레이더 개편(§7.3, FR-5.1b)**: 세부 축에 소스(Git/문서/메신저) 2줄 라벨 명시, 범례를 전용 axes로 분리해 폴리곤과 겹치지 않게 수평 배치, **종합 레이더 + 인원별 개인 레이더를 한 행으로 병렬** 배치(GridSpec `[종합|범례|개인×N]`). `axis_labels`는 순수 라벨 유지로 §11 회귀 보존, 접근자(toggle/highlight/visible)는 종합 폴리곤 대상으로 유지. (3) **차트 배치 교체(§6.6, FR-5.1)**: 산점도↔레이더 위치 맞바꿈 — 상단 `[막대|산점도]`, 하단 전체 폭 레이더(레이더 가로 폭 증가 대응).** | QCE 개발팀 (이대한) |

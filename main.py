@@ -68,6 +68,10 @@ def main() -> None:
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
 
+    # FR-5.8: 시스템(Windows) 라이트/다크 설정을 자동 반영 (이후 설정 팝업에서 전환 가능)
+    from qce.view.style.theme import theme_manager
+    theme_manager.apply()
+
     orchestrator = AnalysisOrchestrator()
     main_window = MainWindow()
     _controller = AppController(main_window, orchestrator)  # keeps reference alive

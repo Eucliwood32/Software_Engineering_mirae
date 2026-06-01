@@ -1,8 +1,17 @@
 """
-RadarChartWidget — Git/문서/메신저 3축 레이더 (view-design §7.3, FR-5.1b).
+RadarChartWidget — 가변 세부 축 레이더 (view-design §7.3, FR-5.1b).
 
-팀원 N개 + 팀 평균 1개 = (N+1) 폴리곤, 범례 토글, 결측 축 점선+"(제외됨)",
-중심→최종 확장 애니메이션. 산점도 클릭을 받아 폴리곤 1.5초 하이라이트(결정 B).
+[v1.7] 가용 소스마다 3개 세부 지표 축(소스 1·2·3개 → 3·6·9축). dimensions가
+없으면 레거시 3축(Git/문서/메신저)으로 폴백.
+
+[v2.0]
+- 각 세부 축이 Git/문서/메신저 중 어디에 속하는지 눈금 라벨에 2줄로 명시.
+- 범례를 전용 axes(_legend_ax)로 분리해 폴리곤과 겹치지 않게 수평 배치.
+- 한 figure에 종합 레이더(전체 팀원+팀 평균)와 인원별 개인 레이더를 한 행으로
+  나란히 배치: [종합 | 범례 | 개인1 | 개인2 | …].
+
+토글·하이라이트·결측 접근자는 모두 '종합 레이더'의 폴리곤(_member_lines)을 대상으로
+유지해 기존 테스트 회귀를 막는다(view-design §7.3 테스트 표면 보존).
 """
 from __future__ import annotations
 
@@ -10,7 +19,7 @@ import math
 
 from PyQt6.QtCore import QTimer
 
-from qce.view.charts.base_chart import BaseChartWidget
+from qce.view.charts.base_chart import PLACEHOLDER_TEXT, BaseChartWidget
 from qce.view.contract import (
     K_AUTHOR,
     K_DOC,
@@ -35,17 +44,23 @@ _AXIS_SPEC = [
     ("메신저", K_MSG, SRC_MSG),
 ]
 
+# dimensions 세부 키 → 소속 소스 (축 소스 명시용 역인덱스, v2.0)
+_KEY_SOURCE: dict[str, str] = {
+    key: src for src, specs in DIM_AXES.items() for key, _label in specs
+}
+
 
 class RadarChartWidget(BaseChartWidget):
     AXIS_LABELS = ["Git", "문서", "메신저"]
+    SRC_DISPLAY = {SRC_GIT: "Git", SRC_DOC: "문서", SRC_MSG: "메신저"}
     HIGHLIGHT_MS = 1500
 
-    def _create_axes(self) -> None:
-        self.ax = self.figure.add_subplot(111, projection="polar")
-
+    # ------------------------------------------------------------------ #
+    # 축 구성
+    # ------------------------------------------------------------------ #
     def _resolve_axes(self) -> list[tuple[str, str]] | None:
         """[v1.7] 점수 dict의 dimensions 기반 가변 세부 축. 가용 소스마다 DIM_AXES 순서로
-        (축 키, 라벨) 3개를 누적해 3/6/9축을 만든다. dimensions가 없으면 None(레거시 3축 폴백)."""
+        (축 키, 라벨) 3개를 누적해 3/6/9축을 만든다. dimensions가 없으면 None(레거시 3축)."""
         if not any(m.get(K_DIMENSIONS) for m in self._scores):
             return None
         present: set[str] = set()
@@ -65,62 +80,113 @@ class RadarChartWidget(BaseChartWidget):
             return [float(dims.get(k, 0.0)) for k in (self._axis_keys or [])]
         return [float(m[key]) for _label, key, _src in _AXIS_SPEC]
 
+    def _build_tick_labels(self) -> list[str]:
+        """[v2.0] 눈금 라벨 구성. 동적 모드는 '{소스}\\n{세부지표}', 레거시는 결측 축 표기."""
+        self._excluded_axis_labels = []
+        if self._dynamic:
+            labels = []
+            for key, label in zip(self._axis_keys or [], self._axis_labels):
+                src = _KEY_SOURCE.get(key)
+                disp = self.SRC_DISPLAY.get(src, "") if src else ""
+                labels.append(f"{disp}\n{label}" if disp else label)
+            return labels
+        # 레거시 3축: 결측 축은 "(제외됨)" 라벨 표기
+        tick_labels = []
+        for label, _key, src in _AXIS_SPEC:
+            if src in self._missing:
+                marked = f"{label} (제외됨)"
+                tick_labels.append(marked)
+                self._excluded_axis_labels.append(marked)
+            else:
+                tick_labels.append(label)
+        return tick_labels
+
+    # ------------------------------------------------------------------ #
+    # 렌더
+    # ------------------------------------------------------------------ #
     def _render_static(self) -> None:
-        self.ax.clear()
+        self._apply_canvas_theme()
+        self.figure.clear()
 
         axes = self._resolve_axes()
         self._dynamic = axes is not None
-        self._excluded_axis_labels: list[str] = []
         self._axis_keys: list[str] | None
         if axes is not None:
             self._axis_keys = [k for k, _l in axes]
             self._axis_labels = [label for _k, label in axes]
-            tick_labels = list(self._axis_labels)
         else:
-            # 레거시 3축: 결측 축은 "(제외됨)" 라벨 표기
             self._axis_keys = None
             self._axis_labels = list(self.AXIS_LABELS)
-            tick_labels = []
-            for label, _key, src in _AXIS_SPEC:
-                if src in self._missing:
-                    marked = f"{label} (제외됨)"
-                    tick_labels.append(marked)
-                    self._excluded_axis_labels.append(marked)
-                else:
-                    tick_labels.append(label)
 
+        tick_labels = self._build_tick_labels()
         n_axes = len(self._axis_labels)
-        # 각 축 각도 (꼭짓점)
         self._angles = [i / n_axes * 2 * math.pi for i in range(n_axes)]
 
-        self.ax.set_theta_offset(math.pi / 2)
-        self.ax.set_theta_direction(-1)
-        self.ax.set_ylim(0.0, 1.0)
-        self.ax.set_yticks([T.GRID_STEP * k for k in range(1, 6)])  # 0.2 간격 5단계
-        self.ax.set_yticklabels([])
-        self.ax.set_xticks(self._angles)
-        self.ax.set_xticklabels(tick_labels)
+        n_members = len(self._scores)
+        # GridSpec 1행: [종합 | 범례 | 개인×N]. 범례 열에 여백을 둬 폴리곤과 분리(v2.0).
+        width_ratios = [1.6, 0.8] + [1.0] * n_members
+        gs = self.figure.add_gridspec(1, 2 + n_members, width_ratios=width_ratios, wspace=0.6)
 
-        # 팀 평균 폴리곤(회색 점선) + 팀원 폴리곤
-        self._draw_team_average()
-        self._member_lines = []      # (line, fill) per member
-        self._base_radii = []        # 최종 반경 목록 (애니 스케일 대상)
+        self.ax = self.figure.add_subplot(gs[0, 0], projection="polar")
+        self._legend_ax = self.figure.add_subplot(gs[0, 1])
+        self._legend_ax.axis("off")
+
+        # 애니메이션 대상(종합+개인 모든 폴리곤)과 종합 폴리곤(접근자 대상)을 분리 추적.
+        self._anim: list = []
+        self._member_lines = []
+        self._base_radii = []
+
+        # --- 종합 레이더 ---
+        self._setup_polar(self.ax, tick_labels, fontsize=8)
+        self._avg_line = self._draw_team_average(self.ax)
         for m in self._scores:
             radii = self._radii_for(m)
-            self._base_radii.append(radii)
-            closed_theta = self._angles + [self._angles[0]]
-            closed_r = [0.0] * (n_axes + 1)
-            (line,) = self.ax.plot(closed_theta, closed_r, linewidth=1.8, zorder=3)
-            fill = self.ax.fill(closed_theta, closed_r, alpha=0.08, zorder=2)[0]
+            line, fill = self._add_polygon(self.ax, n_axes)
             self._member_lines.append((line, fill))
+            self._base_radii.append(radii)
+            self._anim.append((line, fill, radii))
+        self.ax.set_title("종합", fontsize=10)
 
-        self.ax.legend(
-            [ln for ln, _f in self._member_lines] + [self._avg_line],
-            [m[K_AUTHOR] for m in self._scores] + ["팀 평균"],
-            loc="upper right", bbox_to_anchor=(1.25, 1.1), fontsize=8,
+        # --- 분리 범례(전용 axes) ---
+        self._legend_ax.legend(
+            handles=[ln for ln, _f in self._member_lines] + [self._avg_line],
+            labels=[m[K_AUTHOR] for m in self._scores] + ["팀 평균"],
+            loc="center", fontsize=8, frameon=False,
         )
 
-    def _draw_team_average(self) -> None:
+        # --- 인원별 개인 레이더 ---
+        self._indiv_axes = []
+        for i, m in enumerate(self._scores):
+            ax_i = self.figure.add_subplot(gs[0, 2 + i], projection="polar")
+            self._setup_polar(ax_i, tick_labels, fontsize=6)
+            self._draw_team_average(ax_i, faint=True)
+            radii = self._radii_for(m)
+            color = self._member_lines[i][0].get_color()
+            line, fill = self._add_polygon(ax_i, n_axes, color=color)
+            self._anim.append((line, fill, radii))
+            ax_i.set_title(m[K_AUTHOR], fontsize=9)
+            self._indiv_axes.append(ax_i)
+
+    def _setup_polar(self, ax, tick_labels: list[str], fontsize: int = 8) -> None:
+        ax.set_theta_offset(math.pi / 2)
+        ax.set_theta_direction(-1)
+        ax.set_ylim(0.0, 1.0)
+        ax.set_yticks([T.GRID_STEP * k for k in range(1, 6)])  # 0.2 간격 5단계
+        ax.set_yticklabels([])
+        ax.set_xticks(self._angles)
+        ax.set_xticklabels(tick_labels, fontsize=fontsize)
+        ax.grid(color=T.COLOR_GRID)
+        self._style_axes(ax)
+
+    def _add_polygon(self, ax, n_axes: int, color=None):
+        """ax에 0반경 폴리곤(line+fill)을 추가하고 반환(애니메이션으로 확장)."""
+        closed_theta = self._angles + [self._angles[0]]
+        closed_r = [0.0] * (n_axes + 1)
+        (line,) = ax.plot(closed_theta, closed_r, linewidth=1.8, zorder=3, color=color)
+        fill = ax.fill(closed_theta, closed_r, alpha=0.08, zorder=2, color=line.get_color())[0]
+        return line, fill
+
+    def _draw_team_average(self, ax, faint: bool = False):
         per_member = [self._radii_for(m) for m in self._scores]
         n_axes = len(self._axis_labels)
         avg = []
@@ -129,22 +195,42 @@ class RadarChartWidget(BaseChartWidget):
             avg.append(sum(vals) / len(vals) if vals else 0.0)
         closed_theta = self._angles + [self._angles[0]]
         closed_r = avg + [avg[0]]
-        (self._avg_line,) = self.ax.plot(
+        (line,) = ax.plot(
             closed_theta, closed_r, linestyle="--", color=T.COLOR_AVG_LINE,
-            linewidth=1.5, zorder=4,
+            linewidth=1.0 if faint else 1.5, alpha=0.4 if faint else 1.0, zorder=4,
         )
+        return line
 
     def _draw_frame(self, progress: float) -> None:
         closed_theta = self._angles + [self._angles[0]]
-        for (line, fill), radii in zip(self._member_lines, self._base_radii):
+        for line, fill, radii in self._anim:
             scaled = [r * progress for r in radii]
             closed_r = scaled + [scaled[0]]
             line.set_data(closed_theta, closed_r)
             fill.set_xy(list(zip(closed_theta, closed_r)))
         self.canvas.draw_idle()
 
+    # ------------------------------------------------------------------ #
+    # placeholder (다중 subplot 잔상 방지 위해 figure 초기화 후 단일 축)
+    # ------------------------------------------------------------------ #
+    def show_placeholder(self) -> None:
+        self._apply_canvas_theme()
+        self.figure.clear()
+        self.ax = self.figure.add_subplot(111)
+        self.ax.set_facecolor(T.COLOR_SURFACE)
+        self.ax.set_axis_off()
+        self.ax.text(
+            0.5, 0.5, PLACEHOLDER_TEXT,
+            ha="center", va="center", color=T.COLOR_MUTED,
+            transform=self.ax.transAxes,
+        )
+        self.canvas.draw_idle()
+
+    # ------------------------------------------------------------------ #
+    # 상호작용 (종합 레이더 폴리곤 대상)
+    # ------------------------------------------------------------------ #
     def toggle_member(self, index: int) -> None:
-        """범례 클릭 슬롯. 해당 폴리곤 visible 토글."""
+        """범례 클릭 슬롯. 종합 레이더 해당 폴리곤 visible 토글."""
         line, fill = self._member_lines[index]
         vis = not line.get_visible()
         line.set_visible(vis)
@@ -152,7 +238,7 @@ class RadarChartWidget(BaseChartWidget):
         self.canvas.draw_idle()
 
     def highlight_member(self, author: str) -> None:
-        """산점도 연동 슬롯(INV-V4). 굵기 2배로 1.5초 강조 후 원복."""
+        """산점도 연동 슬롯(INV-V4). 종합 폴리곤 굵기 2배로 1.5초 강조 후 원복."""
         for (line, _fill), m in zip(self._member_lines, self._scores):
             if m[K_AUTHOR] == author:
                 orig = line.get_linewidth()
@@ -176,7 +262,7 @@ class RadarChartWidget(BaseChartWidget):
     # ------------------------------------------------------------------ #
     @property
     def axis_labels(self) -> list[str]:
-        """현재 렌더된 축 라벨. 동적 모드면 세부 축(3/6/9개), 폴백/렌더 전이면 레거시 3축."""
+        """현재 렌더된 순수 축 라벨(소스 접두 없음). 동적이면 세부 축(3/6/9), 폴백/렌더 전이면 3축."""
         return list(getattr(self, "_axis_labels", self.AXIS_LABELS))
 
     def is_polygon_visible(self, index: int) -> bool:

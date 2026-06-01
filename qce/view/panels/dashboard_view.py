@@ -36,10 +36,15 @@ class DashboardView(QWidget):
         self.signals_panel = AnomalySignalPanel()
         self.signals_panel.signal_dismissed.connect(self.signal_dismissed)
 
+        # [v2.0] 산점도↔레이더 교체: 상단 [막대 | 산점도], 하단 전체 폭 레이더(종합+개인)
         grid = QGridLayout()
         grid.addWidget(self.bar, 0, 0)
-        grid.addWidget(self.radar, 0, 1)
-        grid.addWidget(self.scatter, 1, 0, 1, 2)
+        grid.addWidget(self.scatter, 0, 1)
+        grid.addWidget(self.radar, 1, 0, 1, 2)
+        grid.setRowStretch(0, 1)
+        grid.setRowStretch(1, 1)
+        grid.setColumnStretch(0, 1)
+        grid.setColumnStretch(1, 1)
 
         root = QVBoxLayout(self)
         root.addLayout(grid)

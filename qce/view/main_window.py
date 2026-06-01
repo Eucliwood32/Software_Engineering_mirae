@@ -10,13 +10,15 @@ INV-V1/V2: model/controller/common import 금지. Signal은 발행만 하고 con
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QMainWindow, QStackedWidget
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtWidgets import QMainWindow, QStackedWidget, QToolButton
 
+from qce.view.dialogs.settings_dialog import SettingsDialog
 from qce.view.panels.loading_screen import LoadingScreen
 from qce.view.panels.result_screen import ResultScreen
 from qce.view.panels.submit_screen import SubmitScreen
 from qce.view.style.qss import app_stylesheet
+from qce.view.style.theme import theme_manager
 
 
 from PyQt6.QtGui import QIcon
@@ -40,12 +42,29 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.stack)
 
         self._build_menu()
+        # [v2.0] 테마 변경 시 앱 전역 QSS 재적용(차트 재채색은 각 차트가 직접 구독)
+        theme_manager.changed.connect(self._reapply_theme)
         self.show_submit()
 
     def _build_menu(self) -> None:
         menu = self.menuBar().addMenu("파일")
         act_save = menu.addAction("리포트 저장…")
         act_save.triggered.connect(self.save_report_requested.emit)
+
+        # [v2.0] 우측 상단 끝 설정 버튼(코너 위젯, FR-5.8)
+        self.settings_btn = QToolButton()
+        self.settings_btn.setText("⚙")
+        self.settings_btn.setToolTip("설정")
+        self.settings_btn.setAutoRaise(True)
+        self.settings_btn.clicked.connect(self._open_settings)
+        self.menuBar().setCornerWidget(self.settings_btn, Qt.Corner.TopRightCorner)
+
+    def _open_settings(self) -> None:
+        dlg = SettingsDialog(self)
+        dlg.exec()
+
+    def _reapply_theme(self) -> None:
+        self.setStyleSheet(app_stylesheet())
 
     # ------------------------------------------------------------------ #
     # 화면 전환 (FR-5.4) — Controller가 생명주기에 맞춰 호출
