@@ -414,6 +414,8 @@ class ProgressBar(QWidget):
 ### 6.9 SubmitScreen `submit_screen.py` (~180) — FR-5.5
 메인(제출) 화면. 중앙 상단에 **큼직한 로고**(`assets/logo.png`)와 프로그램 설명 1~2줄, 그 아래 **멀티포맷 드래그앤드롭 존**(.pptx/.docx/.hwpx 문서 + .txt 카톡), Git 저장소 선택 버튼, **AnalysisPanel(가중치, FR-4.4)**, [분석 시작] 버튼을 배치한다. 드롭 이벤트를 확장자로 분기해 Signal로 올린다(기존 MainWindow의 드롭 로직 이동).
 
+**[v1.6 개선] 드롭존 적재 파일 목록 표시.** 드롭존은 적재 상태에 따라 두 가지로 렌더한다. ① **하나도 적재되지 않았을 때**는 기존 안내 문구(`_DROP_HINT`: "여기에 문서…를 끌어다 놓으세요")를 가운데 정렬로 표시한다. ② **하나라도 적재되면** 적재된 항목을 *종류별 아이콘 + 파일명*(문서 📄 / 메신저 💬 / Git 저장소 🗂)으로 한 줄씩 좌측 정렬 목록으로 표시한다. 항목은 적재 순서를 유지하며, 파일명은 경로가 아닌 **basename**만 노출한다(개인정보·경로 노출 최소화). 드롭존 하단의 `_loaded_label`은 종전대로 "문서 N개 · 메신저 M개 … 적재됨" 요약을 유지한다(보조 피드백·테스트 접근자).
+
 ```python
 class SubmitScreen(QWidget):
     documents_dropped = pyqtSignal(list)     # .pptx/.docx/.hwpx
@@ -424,11 +426,14 @@ class SubmitScreen(QWidget):
         self.analysis_panel = AnalysisPanel()    # 가중치 프리셋·슬라이더 합성(FR-4.4)
     def dropEvent(self, e) -> None:
         """확장자 분기: 문서→documents_dropped(list), .txt→messenger_dropped(str)."""
+    def _refresh_dropzone(self) -> None:
+        """[v1.6] 적재 항목이 있으면 아이콘+파일명 목록을, 없으면 안내 문구를 드롭존에 렌더."""
     def clear_inputs(self) -> None:
         """[개선] 이전 사이클에서 적재된 파일명/저장소명 및 UI 텍스트를 초기화(리셋)한다."""
     def loaded_summary(self) -> str: ...         # "N/N 적재" 피드백 (테스트 접근자)
+    def loaded_files(self) -> list[str]: ...     # [v1.6] 적재된 파일명 목록 (테스트 접근자)
 ```
-수용기준 대응(FR-5.5): 로고·설명 표시, 멀티포맷 드롭존, 적재 개수 피드백, Git 진입점, 가중치 패널, [분석 시작]→로딩 화면 전환. `analyze_clicked`는 AnalysisPanel이 발행한다.
+수용기준 대응(FR-5.5): 로고·설명 표시, 멀티포맷 드롭존(빈 상태 안내 문구 ↔ 적재 시 아이콘+파일명 목록), 적재 개수 피드백, Git 진입점, 가중치 패널, [분석 시작]→로딩 화면 전환. `analyze_clicked`는 AnalysisPanel이 발행한다.
 
 ### 6.10 LoadingScreen `loading_screen.py` (~70) — FR-5.6
 분석 로딩 화면. 전체 화면에 로고/스피너와 ProgressBar(§6.8)를 중앙 배치한다. 분석 시작 1초 이내 진입(NFR-1.1), 진행률 갱신, 완료/오류 시 결과/제출 화면으로 전환(전환은 Controller). 진행률 메서드는 내부 ProgressBar에 위임한다.
@@ -743,3 +748,4 @@ GRID_STEP          = 0.2
 | **v1.3** | **2026-05-31** | **3-스크린 구조(FR-5.4) 및 결과화면 계정 병합(FR-5.7) 반영. (1) §3: MainWindow를 QStackedWidget 셸로 재정의, `panels/submit_screen.py`·`loading_screen.py`·`result_screen.py`·`assets/logo.png` 추가, LOC 표·합계 갱신. (2) §4 합성 트리를 MainWindow→3스크린 구조로 교체. (3) §5.1 입력 드롭 신호 발신을 MainWindow→SubmitScreen으로 이동, `alias_mapping_requested` 제거, `merge_requested`·`new_analysis_requested` 신설. (4) §5.2 화면 전환 슬롯(show_submit/loading/result)·ResultScreen.render/populate_merge 추가. (5) §6.1 MainWindow를 셸+스택으로 개정, §6.3 AliasMappingDialog를 결과화면 병합 컨트롤로 용도 변경(FR-1.3 일원화, 분석-전 모달 폐기), §6.9 SubmitScreen·§6.10 LoadingScreen·§6.11 ResultScreen 신설. (6) §8 상태 전이를 Submit→Loading→Result 3화면 모델로 개정, 병합 시 재집계(Model 왕복) 경유 명시. 가중치 패널은 제출 화면에 배치. 상위 요구사항은 RR v1.4 FR-5.4~5.7 참조. | QCE 개발팀 (이대한) |
 | **v1.4** | **2026-05-31** | **구 SRS.md 폐지 반영 — 이상 신호 카드 UI·신원 매핑 추천 도입. (1) **§6.12 AnomalySignalPanel 신설**(FR-4.2/4.2b/4.2d 신호 카드 + FR-4.2c "정상으로 표시" 버튼, `signal_dismissed` 중계만). (2) §6.6 DashboardView에 `signals_panel`·`signal_dismissed` 통합. (3) §6.11 ResultScreen에 `signal_dismissed` 중계·`set_suggested_mapping` 추가. (4) §6.3 AliasMappingDialog에 `apply_suggested`(AliasExtractor 추천 기본선택, 자동병합 아님) 추가. (5) §5.1에 `signal_dismissed`, §5.2에 `set_suggested_mapping` 행 추가. (6) §5.3 점수 dict 스키마에 `signal_details`·`commit_dates` 키 및 contract 상수 `K_SIGNAL_DETAILS`·`K_COMMIT_DATES` 추가, signals 예시 갱신. (7) §12 RTM에 AnomalySignalPanel 행 추가. Model 측 상세는 model-business-logic-design.md v1.3 §2.10·§2.11, 배선은 controller-design.md 참조. | QCE 개발팀 |
 | v1.5 | 2026-06-01 | 사용자 피드백(UI/UX 개선 및 버그 수정) 반영: (1) §6.3 AliasMappingDialog 미선택 시 OK 버튼 방어 로직 추가. (2) §6.5 AnalysisPanel에 설명 문구('작업 종류 별 반영 비율') 및 실시간 숫자 표기 갱신 메서드 추가. (3) §6.6/§7.1 placeholder 안내 문구를 '분석할 데이터가 없습니다.'로 변경. (4) §6.9 SubmitScreen에 입력 데이터 리셋(clear_inputs) 및 파일명("없음" 포함) 노출 사양 추가. (5) §6.11 ResultScreen에 매핑 취소 UI 증발 방지 메서드(reset_mapping_state) 추가. (6) §7.2/§7.4 차트 툴팁 구성에 원시 데이터(Raw data) 노출 구체화. | QCE 개발팀 |
+| v1.6 | 2026-06-01 | 사용자 피드백(드롭존 UX 개선) 반영: §6.9 SubmitScreen 드롭존이 적재 상태에 따라 분기 렌더하도록 사양 추가 — 빈 상태는 기존 안내 문구, 1개 이상 적재 시 종류별 아이콘(문서 📄 / 메신저 💬 / Git 🗂) + 파일명(basename) 목록을 좌측 정렬로 표시. `_refresh_dropzone`·`loaded_files()` 접근자 명시. | QCE 개발팀 |

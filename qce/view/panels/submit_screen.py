@@ -9,6 +9,7 @@ INV-V1/V2: model/controller import 금지. Signal은 발행만, connect는 Contr
 """
 from __future__ import annotations
 
+import html
 import os
 
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -34,6 +35,11 @@ _DROP_HINT = (
     "(폴더를 통째로 끌면 내부의 문서·대화·Git 저장소를 자동으로 찾아 적재합니다)"
 )
 
+# 적재 항목 종류별 아이콘 (드롭존 목록 표시용, view-design §6.9 v1.6)
+_ICON_DOC = "📄"
+_ICON_MSG = "💬"
+_ICON_GIT = "🗂"
+
 
 class SubmitScreen(QWidget):
     documents_dropped = pyqtSignal(list)     # .pptx/.docx/.hwpx
@@ -46,6 +52,10 @@ class SubmitScreen(QWidget):
         self._doc_count = 0
         self._msg_count = 0
         self._git_loaded = False
+        # 적재된 항목명(basename)을 종류별·적재순으로 보관 → 드롭존 목록 렌더에 사용
+        self._doc_names: list[str] = []
+        self._msg_names: list[str] = []
+        self._git_names: list[str] = []
 
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 24, 24, 24)
@@ -67,10 +77,13 @@ class SubmitScreen(QWidget):
         desc.setWordWrap(True)
         root.addWidget(desc)
 
-        # 드롭존
+        # 드롭존: 빈 상태는 안내 문구, 1개 이상 적재 시 아이콘+파일명 목록 (§6.9 v1.6)
         self._dropzone = QLabel(_DROP_HINT)
         self._dropzone.setObjectName("dropzone")
+        self._dropzone.setTextFormat(Qt.TextFormat.RichText)
+        self._dropzone.setWordWrap(True)
         self._dropzone.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._dropzone.setContentsMargins(16, 12, 16, 12)
         self._dropzone.setMinimumHeight(140)
         self._dropzone.setStyleSheet(
             "QLabel#dropzone { border: 2px dashed #9aa0a6; border-radius: 8px; color: #80868b; }"
@@ -112,14 +125,18 @@ class SubmitScreen(QWidget):
         docs, messengers = self._classify_paths(files)
         if docs:
             self._doc_count += len(docs)
+            self._doc_names.extend(os.path.basename(d) for d in docs)
             self.documents_dropped.emit(docs)
         for m in messengers:
             self._msg_count += 1
+            self._msg_names.append(os.path.basename(m))
             self.messenger_dropped.emit(m)
         for repo in git_repos:
             self._git_loaded = True
+            self._git_names.append(os.path.basename(os.path.normpath(repo)))
             self.git_repo_chosen.emit(repo)
         self._refresh_loaded_label()
+        self._refresh_dropzone()
 
     @staticmethod
     def _classify_paths(paths: list[str]) -> tuple[list[str], list[str]]:
@@ -171,8 +188,10 @@ class SubmitScreen(QWidget):
         path = QFileDialog.getExistingDirectory(self, "Git 저장소 선택")
         if path:
             self._git_loaded = True
+            self._git_names.append(os.path.basename(os.path.normpath(path)))
             self.git_repo_chosen.emit(path)
             self._refresh_loaded_label()
+            self._refresh_dropzone()
 
     def _refresh_loaded_label(self) -> None:
         git_txt = " · Git 저장소" if self._git_loaded else ""
@@ -180,13 +199,43 @@ class SubmitScreen(QWidget):
             f"문서 {self._doc_count}개 · 메신저 {self._msg_count}개{git_txt} 적재됨"
         )
 
+    def _refresh_dropzone(self) -> None:
+        """적재 항목이 있으면 아이콘+파일명 목록을, 없으면 안내 문구를 드롭존에 렌더(§6.9 v1.6)."""
+        rows: list[tuple[str, str]] = []
+        rows += [(_ICON_DOC, name) for name in self._doc_names]
+        rows += [(_ICON_MSG, name) for name in self._msg_names]
+        rows += [(_ICON_GIT, f"{name} (Git 저장소)") for name in self._git_names]
+
+        if not rows:
+            self._dropzone.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._dropzone.setText(_DROP_HINT)
+            return
+
+        items = "".join(
+            f"<div style='margin:3px 0;'>{icon}&nbsp;&nbsp;"
+            f"{html.escape(label)}</div>"
+            for icon, label in rows
+        )
+        self._dropzone.setAlignment(
+            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft
+        )
+        self._dropzone.setText(f"<div style='font-size:11pt;'>{items}</div>")
+
     def reset(self) -> None:
         """이전 분석 입력값(문서, 메신저, Git 상태 등)을 초기화한다."""
         self._doc_count = 0
         self._msg_count = 0
         self._git_loaded = False
+        self._doc_names.clear()
+        self._msg_names.clear()
+        self._git_names.clear()
         self._loaded_label.setText("")
+        self._refresh_dropzone()
 
     # --- 테스트 접근자 ---
     def loaded_summary(self) -> str:
         return self._loaded_label.text()
+
+    def loaded_files(self) -> list[str]:
+        """드롭존에 표시 중인 적재 파일명 목록(문서→메신저→Git 순)."""
+        return [*self._doc_names, *self._msg_names, *self._git_names]

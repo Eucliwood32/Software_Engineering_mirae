@@ -82,6 +82,35 @@ def test_has_analysis_panel(qtbot):                             # TC-FR-5.5-05
     assert w.analysis_panel.analyze_enabled() is False
 
 
+def test_dropzone_shows_hint_when_empty(qtbot):                 # §6.9 v1.6
+    w = SubmitScreen()
+    qtbot.addWidget(w)
+    assert "끌어다 놓으세요" in w._dropzone.text()
+    assert w.loaded_files() == []
+
+
+def test_dropzone_lists_filenames(qtbot):                       # §6.9 v1.6
+    w = SubmitScreen()
+    qtbot.addWidget(w)
+    w._handle_dropped_paths(["/in/report.docx", "/in/chat.txt"])
+    text = w._dropzone.text()
+    assert "report.docx" in text
+    assert "chat.txt" in text          # basename only, no path
+    assert "/in/" not in text
+    assert "끌어다 놓으세요" not in text
+    assert w.loaded_files() == ["report.docx", "chat.txt"]
+
+
+def test_dropzone_reverts_to_hint_after_reset(qtbot):           # §6.9 v1.6
+    w = SubmitScreen()
+    qtbot.addWidget(w)
+    w._handle_dropped_paths(["a.docx"])
+    assert "a.docx" in w._dropzone.text()
+    w.reset()
+    assert "끌어다 놓으세요" in w._dropzone.text()
+    assert w.loaded_files() == []
+
+
 def test_reset_clears_counts(qtbot):
     p = SubmitScreen()
     qtbot.addWidget(p)
