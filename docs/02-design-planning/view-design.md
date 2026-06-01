@@ -600,7 +600,7 @@ class RadarChartWidget(BaseChartWidget):
 ```
 
 ### 7.4 ScatterChartWidget `scatter_chart.py` (~390) — FR-5.1c
-X=Git, Y=문서, 점 크기=메신저(40~200pt 선형), 사분면 4색+레이블, 평균 십자선, 9항목 툴팁, 라벨 겹침 4방향 해소, fade-in 애니메이션, 하위 이상치 점 붉은색+⚠. **점 클릭 시 `member_selected(author)` 발행**(결정 B; 누가 듣는지 모름).
+**[v1.8] 사분면 기준점 고정.** X=Git, Y=문서, 점 크기=메신저(40~200pt 선형), **사분면 4색+레이블(기준점 항상 0.5, 0.5)**, 십자선(0.5, 0.5 고정), 9항목 툴팁, 라벨 겹침 4방향 해소, fade-in 애니메이션, 하위 이상치 점 붉은색+⚠. 점 크기 및 사분면 배경은 진행(progress)에 맞춰 fade-in한다(유명 팀원이 우상에 몰리는 착각 방지). **점 클릭 시 `member_selected(author)` 발행**(결정 B; 누가 듣는지 모름).
 
 ```python
 class ScatterChartWidget(BaseChartWidget):
@@ -626,7 +626,7 @@ class ScatterChartWidget(BaseChartWidget):
     def quadrant_labels(self) -> list[str]: ...              # test_scatter_quadrant_labels (4개)
     def dot_size(self, author: str) -> float: ...            # test_scatter_dot_size_range / missing(80)
     @property
-    def crosshair_xy(self) -> tuple[float, float]: ...       # test_scatter_average_crosshair
+    def crosshair_xy(self) -> tuple[float, float]: ...       # 항상 (0.5, 0.5). test_scatter_crosshair_at_center
     def min_label_distance(self) -> float: ...               # test_scatter_label_overlap (≥30)
 ```
 
@@ -770,5 +770,6 @@ GRID_STEP          = 0.2
 | **v1.4** | **2026-05-31** | **구 SRS.md 폐지 반영 — 이상 신호 카드 UI·신원 매핑 추천 도입. (1) **§6.12 AnomalySignalPanel 신설**(FR-4.2/4.2b/4.2d 신호 카드 + FR-4.2c "정상으로 표시" 버튼, `signal_dismissed` 중계만). (2) §6.6 DashboardView에 `signals_panel`·`signal_dismissed` 통합. (3) §6.11 ResultScreen에 `signal_dismissed` 중계·`set_suggested_mapping` 추가. (4) §6.3 AliasMappingDialog에 `apply_suggested`(AliasExtractor 추천 기본선택, 자동병합 아님) 추가. (5) §5.1에 `signal_dismissed`, §5.2에 `set_suggested_mapping` 행 추가. (6) §5.3 점수 dict 스키마에 `signal_details`·`commit_dates` 키 및 contract 상수 `K_SIGNAL_DETAILS`·`K_COMMIT_DATES` 추가, signals 예시 갱신. (7) §12 RTM에 AnomalySignalPanel 행 추가. Model 측 상세는 model-business-logic-design.md v1.3 §2.10·§2.11, 배선은 controller-design.md 참조. | QCE 개발팀 |
 | v1.5 | 2026-06-01 | 사용자 피드백(UI/UX 개선 및 버그 수정) 반영: (1) §6.3 AliasMappingDialog 미선택 시 OK 버튼 방어 로직 추가. (2) §6.5 AnalysisPanel에 설명 문구('작업 종류 별 반영 비율') 및 실시간 숫자 표기 갱신 메서드 추가. (3) §6.6/§7.1 placeholder 안내 문구를 '분석할 데이터가 없습니다.'로 변경. (4) §6.9 SubmitScreen에 입력 데이터 리셋(clear_inputs) 및 파일명("없음" 포함) 노출 사양 추가. (5) §6.11 ResultScreen에 매핑 취소 UI 증발 방지 메서드(reset_mapping_state) 추가. (6) §7.2/§7.4 차트 툴팁 구성에 원시 데이터(Raw data) 노출 구체화. | QCE 개발팀 |
 | v1.6 | 2026-06-01 | 사용자 피드백(드롭존 UX 개선) 반영: §6.9 SubmitScreen 드롭존이 적재 상태에 따라 분기 렌더하도록 사양 추가 — 빈 상태는 기존 안내 문구, 1개 이상 적재 시 종류별 아이콘(문서 📄 / 메신저 💬 / Git 🗂) + 파일명(basename) 목록을 좌측 정렬로 표시. `_refresh_dropzone`·`loaded_files()` 접근자 명시. | QCE 개발팀 |
+| v1.8 | 2026-06-01 | 사용자 피드백(산점도 사분면 고정) 반영: §7.4 ScatterChartWidget 사분면 기준점을 팀원 평균(가변)에서 **항상 (0.5, 0.5) 정규화 중점**으로 고정. 이로써 4개 사분면이 항상 동일한 면적(0.25×0.25)을 유지하며, 앱 화면 비율과 무관하게 일관된 시각 분석이 가능. 십자선 위치 고정, `crosshair_xy` 항상 (0.5, 0.5) 반환. | QCE 개발팀 |
 | v1.7 | 2026-06-01 | 사용자 피드백(레이더 세부 축) 반영: §7.3 RadarChartWidget을 **가용 소스별 3 세부 축**(소스 1·2·3개 → 3·6·9축)으로 개정, 단일 소스에서도 폴리곤이 정상 형성되도록 함. (1) §5.3 점수 dict에 `dimensions: dict[str,float]` 키 및 소스별 세부 지표 정의 추가(Git=커밋수/추가/정리, 문서=분량/문서수/구성요소, 메신저=발화수/발화량/시간대). (2) contract 스니펫에 `K_DIMENSIONS`·`DIM_AXES`·`DIM_SOURCE_ORDER` 추가. (3) §7.3 가변 축 렌더 + `dimensions` 부재 시 레거시 3축 폴백 명시, `_resolve_axes` 접근자 추가. 세부 축은 표시 전용으로 `total_score` 비반영(STR-7 유지). Model 측 산출은 model-business-logic-design v1.4 §2.7 참조. | QCE 개발팀 |
 | **v1.7** | **2026-06-01** | **사용자 피드백(슬라이더 비례 분배·표기 개선) 반영: (1) §6.5 AnalysisPanel 슬라이더 범위 표기를 0.00~1.00에서 0%~100%(step 5%)로 변경. (2) 합계 라벨·경고 문구를 퍼센트 단위(`"합계: 100%"`, `"가중치 합계가 100%여야 합니다"`)로 변경. (3) 슬라이더 비례 재분배 동작 설명에 "나머지 슬라이더들이 기존 비율을 유지하며 같은 비율로 자동 조절" 명시.** | QCE 개발팀 |

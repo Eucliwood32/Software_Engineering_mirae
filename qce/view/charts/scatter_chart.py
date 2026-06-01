@@ -40,8 +40,9 @@ class ScatterChartWidget(BaseChartWidget):
 
         gits = [float(m[K_GIT]) for m in self._scores]
         docs = [float(m[K_DOC]) for m in self._scores]
-        self._mean_x = sum(gits) / len(gits) if gits else 0.5
-        self._mean_y = sum(docs) / len(docs) if docs else 0.5
+        # v1.8: 사분면 기준점 고정 (항상 0.5, 0.5 정규화 중점)
+        self._mean_x = 0.5
+        self._mean_y = 0.5
 
         # 점 크기·색상 (최종값; 애니는 progress로 스케일)
         self._final_sizes: dict[str, float] = {}
@@ -56,8 +57,7 @@ class ScatterChartWidget(BaseChartWidget):
 
         self._draw_quadrants()
 
-        # 평균 십자선
-        self._mean_x = self._mean_x
+        # v1.8: 십자선 (고정 0.5, 0.5)
         self.ax.axvline(self._mean_x, linestyle="--", color=T.COLOR_AVG_LINE, linewidth=1.0)
         self.ax.axhline(self._mean_y, linestyle="--", color=T.COLOR_AVG_LINE, linewidth=1.0)
         self.ax.plot(self._mean_x, self._mean_y, marker="+", color=T.COLOR_AVG_LINE, markersize=10)

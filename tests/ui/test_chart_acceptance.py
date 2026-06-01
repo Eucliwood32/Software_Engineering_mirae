@@ -103,10 +103,9 @@ def test_scatter_average_crosshair(qtbot, score_dicts):         # 11
     w = ScatterChartWidget()
     qtbot.addWidget(w)
     w.render(score_dicts, set())
-    exp_x = sum(m["git_score"] for m in score_dicts) / len(score_dicts)
-    exp_y = sum(m["doc_score"] for m in score_dicts) / len(score_dicts)
+    # v1.8: 십자선이 항상 (0.5, 0.5) 정규화 중점 고정
     cx, cy = w.crosshair_xy
-    assert abs(cx - exp_x) < 1e-4 and abs(cy - exp_y) < 1e-4
+    assert cx == 0.5 and cy == 0.5
 
 
 def test_scatter_missing_messenger_size(qtbot, score_dicts):    # 12
