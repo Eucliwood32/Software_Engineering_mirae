@@ -31,7 +31,7 @@
 ### 1.4 참조 문서
 - Problem Statement v1.2
 - Requirements Record v1.5 (`01-requirements/00-Requirement-records.md`) — 요구사항 정본
-- `05-decisions/ADR-0001-MVC.md`, `ADR-0002-PyQt6.md`, `ADR-0003-IsolationForest.md`
+- 아키텍처 결정 근거(ADR-0001 MVC·ADR-0002 PyQt6·ADR-0003 NLP 엔진) → `02-design-planning/architecture-overview.md` §2 아키텍처 드라이버
 
 ### 1.5 용어
 RR의 용어 정의를 우선 따르며, 본 문서에서 추가로 사용하는 용어는 다음과 같다.
