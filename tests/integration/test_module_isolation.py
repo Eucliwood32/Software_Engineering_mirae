@@ -36,10 +36,18 @@ def test_single_source_available(src):
     scores = _agg().aggregate(**kwargs)
 
     assert scores, "가용 소스가 1개라도 있으면 점수가 생성돼야 함"
+    
+    # FR-4.1 (v1.6) 비례 정규화에 의해 total_score 합계는 1.0이 된다.
+    total_sum = sum(s.total_score for s in scores)
+    assert abs(total_sum - 1.0) < 1e-4, "종합 점수의 합은 1.0이어야 함"
+    
+    # 단일 소스일 경우 total_score는 해당 소스의 정규화 점수에 비례해야 함
     for s in scores:
         attr = {"git": "git_score", "doc": "doc_score", "msg": "msg_score"}[src]
-        assert abs(s.total_score - getattr(s, attr)) < 1e-6, \
-            "단일 소스의 종합 점수는 해당 소스 정규화 점수와 같아야 함"
+        normalized_score = getattr(s, attr)
+        expected_total = normalized_score / sum(getattr(x, attr) for x in scores)
+        assert abs(s.total_score - expected_total) < 1e-4, \
+            "단일 소스의 종합 점수는 해당 소스 정규화 점수에 비례해야 함"
 
 
 # ── 2개 소스 가용 (FR-4.3: 상대 비율 유지 재정규화) ──────────────────────

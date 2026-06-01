@@ -10,7 +10,7 @@ from __future__ import annotations
 from qce.view.charts.bar_chart import BarChartWidget
 from qce.view.charts.radar_chart import RadarChartWidget
 from qce.view.charts.scatter_chart import ScatterChartWidget
-from qce.view.contract import K_TOTAL, SRC_MSG
+from qce.view.contract import K_TOTAL, SRC_MSG, SRC_DOC
 
 
 # ----------------------------- 막대 (FR-5.1a) ----------------------------- #
@@ -64,22 +64,21 @@ def test_radar_missing_data(qtbot, score_dicts):                # 6
 
 
 # ----------------------------- 산점도 (FR-5.1c) --------------------------- #
-def test_scatter_quadrant_labels(qtbot, score_dicts):           # 7
+def test_scatter_dynamic_axes(qtbot, score_dicts):              # 7
     w = ScatterChartWidget()
     qtbot.addWidget(w)
-    w.render(score_dicts, set())
-    labels = w.quadrant_labels
-    assert len(labels) == 4
-    assert set(labels) == {"올라운더", "개발 집중", "문서 집중", "저참여"}
+    w.render(score_dicts, {SRC_MSG})  # 2개 소스 (Git, Doc)
+    assert w.ax.get_ylabel() == "Git 점수"
+    assert w.ax.get_xlabel() == "문서 점수"
 
 
-def test_scatter_dot_size_range(qtbot, score_dicts):            # 8
+def test_scatter_dot_color_saturation(qtbot, score_dicts):      # 8
     w = ScatterChartWidget()
     qtbot.addWidget(w)
-    w.render(score_dicts, set())
+    w.render(score_dicts, set())  # 3개 소스 가용
     for m in score_dicts:
-        size = w.dot_size(m["author"])
-        assert 40.0 <= size <= 200.0
+        alpha = w.dot_color_saturation(m["author"])
+        assert 0.0 <= alpha <= 1.0
 
 
 def test_scatter_signal_emission(qtbot, score_dicts):           # 9
@@ -99,18 +98,22 @@ def test_scatter_label_overlap(qtbot, score_dicts):             # 10
     assert w.min_label_distance() >= 30.0
 
 
-def test_scatter_average_crosshair(qtbot, score_dicts):         # 11
+def test_scatter_dynamic_crosshair(qtbot, score_dicts):         # 11
     w = ScatterChartWidget()
     qtbot.addWidget(w)
     w.render(score_dicts, set())
-    # v1.8: 십자선이 항상 (0.5, 0.5) 정규화 중점 고정
+    # Y = Git, X = Doc (순서에 따라 Git이 첫번째 가용)
     cx, cy = w.crosshair_xy
-    assert cx == 0.5 and cy == 0.5
+    expected_x = sum(m["doc_score"] for m in score_dicts) / len(score_dicts)
+    expected_y = sum(m["git_score"] for m in score_dicts) / len(score_dicts)
+    assert abs(cx - expected_x) < 1e-4
+    assert abs(cy - expected_y) < 1e-4
 
 
-def test_scatter_missing_messenger_size(qtbot, score_dicts):    # 12
+def test_scatter_placeholder_text(qtbot, score_dicts):          # 12
     w = ScatterChartWidget()
     qtbot.addWidget(w)
-    w.render(score_dicts, {SRC_MSG})
-    for m in score_dicts:
-        assert w.dot_size(m["author"]) == 80.0
+    # 1개 소스만 가용하게 만듦
+    w.render(score_dicts, {SRC_MSG, SRC_DOC})
+    # 안내 텍스트가 표시되는지 확인
+    assert any("자료가 한 종류인 경우" in t.get_text() for t in w.ax.texts)

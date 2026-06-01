@@ -57,7 +57,7 @@ class MemberScore:                      # FR-4.* 통합 결과
     dimensions: dict[str, float] = field(default_factory=dict) # [v1.7] 레이더 세부 축(가용 소스별 3키, 표시 전용)
 ```
 
-> **`dimensions` (v1.7, FR-5.1b 레이더 세부 축).** 가용 소스마다 3개의 세부 지표를 Min-Max 정규화(0.0~1.0)한 dict. 결측 소스의 키는 포함하지 않으므로 가용 소스 1·2·3개에 각각 3·6·9개 키가 담긴다. 세부 지표는 다음과 같으며 모두 *표시 전용*(STR-7, `total_score` 비반영)이다.
+> **`dimensions` (v1.7, FR-5.1b 레이더 세부 축).** 가용 소스마다 3개의 세부 지표를 Max 정규화(0.0~1.0)한 dict. 결측 소스의 키는 포함하지 않으므로 가용 소스 1·2·3개에 각각 3·6·9개 키가 담긴다. 세부 지표는 다음과 같으며 모두 *표시 전용*(STR-7, `total_score` 비반영)이다.
 > - **Git** (`CommitStats`에서 산출): `git_commits`(커밋 수) · `git_additions`(추가 라인, Capping+로그스케일) · `git_deletions`(삭제 라인, 로그스케일)
 > - **문서** (`doc_details`에서 산출): `doc_chars`(유효 글자수) · `doc_count`(작성 문서 수) · `doc_blocks`(문단·도형 등 구성 요소 수)
 > - **메신저** (`msg_details`에서 산출): `msg_count`(발화 수) · `msg_chars`(발화 글자수) · `msg_hours`(활동 시간대 수)
@@ -77,17 +77,17 @@ class MemberScore:                      # FR-4.* 통합 결과
 
 ### 2.1 Normalizer (FR-4.1)
 
-- **책임:** 이질적 단위의 지표 3종(Git 추가 라인, 문서 유효 글자수, 메신저 유효 발화 수)을 0.0~1.0 척도로 변환(Min-Max 정규화).
+- **책임:** 이질적 단위의 지표 3종(Git 추가 라인, 문서 유효 글자수, 메신저 유효 발화 수)을 0.0~1.0 척도로 변환(Max 정규화).
 - **시그니처:**
   ```python
   class Normalizer:
       def normalize(self, values: list[float]) -> list[float]:
-          """(x-min)/(max-min). max==min이면 전원 0.5. round(_, 4)."""
+          """x / max. max==0이면 전원 0.0. round(_, 4)."""
   ```
 - **알고리즘:**
-  1. 입력 리스트에서 `min`, `max`를 산출한다.
-  2. `max == min`인 경우 분산 0으로 간주하여 모든 반환값을 `0.5`로 설정한다 (ZeroDivisionError 방지).
-  3. 그 외의 경우 `(x - min) / (max - min)`을 수행한다.
+  1. 입력 리스트에서 `max`를 산출한다.
+  2. `max == 0`인 경우 분모가 0이 되는 것을 방지하여 모든 반환값을 `0.0`으로 설정한다 (ZeroDivisionError 방지).
+  3. 그 외의 경우 `x / max`를 수행한다.
   4. 모든 결과를 소수점 4자리에서 반올림한다 (`round(_, 4)`).
   5. 빈 리스트(`[]`) 입력 시 빈 리스트를 반환하며 예외를 발생시키지 않는다.
 - **사후조건:** 모든 반환값 v에 대해 `0.0 ≤ v ≤ 1.0`.
@@ -138,7 +138,7 @@ class MemberScore:                      # FR-4.* 통합 결과
 - **알고리즘:**
   - `detect_frequency()` (EW-02, FR-4.2b): 작성자별 일자별 커밋 시계열을 구성하여, 특정 일자의 커밋 수가 해당 작성자의 일평균 커밋 수의 3배를 초과하는 구간을 식별한다. 각 신호 항목은 `author`, `period`, `period_commits`, `baseline_avg`를 포함한다.
   - `detect_capping()` (FR-4.2): `CommitStats.commits_list`를 순회하여 단일 커밋 추가 라인이 1,000을 초과하는 커밋을 신호 항목(작성자·커밋 해시 7자·작성일·변경 라인 수)으로 반환한다. (`commits_list`가 비어 있으면 빈 목록 — GitAnalyzer가 커밋 명세를 채워야 동작하며, `model-parser-design.md` 참조.)
-  - `detect_zscore()` / `detect_zscore_detail()` (FR-4.2d): 정규화된 지표(Git, 문서, 메신저)에 대해 팀원별 Z-Score를 산출하고, Z-Score가 -1.5 이하인 항목이 2개 이상 존재하는 팀원을 식별한다. `detect_zscore`는 이름 리스트를, `detect_zscore_detail`은 해당 팀원의 하위 지표명(`metrics`)을 함께 반환한다. 신호 대상 팀원은 산점도(FR-5.1c)에서 붉은색 + ⚠ 오버레이로 강조 표시된다.
+  - `detect_zscore()` / `detect_zscore_detail()` (FR-4.2d): 정규화된 지표(Git, 문서, 메신저)에 대해 팀원별 Z-Score를 산출하고, Z-Score가 -1.5 이하인 항목이 2개 이상 존재하는 팀원을 식별한다. `detect_zscore`는 이름 리스트를, `detect_zscore_detail`은 해당 팀원의 하위 지표명(`metrics`)을 함께 반환한다. 신호 대상 팀원은 산점도(FR-5.1c)에서 ⚠ 오버레이로 강조 표시된다.
   - `build_signal_details()`: 위 탐지 결과를 `MemberScore.signal_details` 스키마(§1.4)로 통합하여 팀원별로 묶는다. CAPPING·EW-02·ZSCORE 세 유형을 단일 구조로 합치며, 신호 카드 패널(`AnomalySignalPanel`, view-design)과 예외 처리(`NormalizedSignalsTracker`, §2.10)의 입력이 된다.
 - **격리 원칙:** 이 클래스의 출력은 `MemberScore.signals`/`signal_details`에 기록되지만, `total_score` 계산 경로에는 투입되지 않는다.
 
@@ -238,7 +238,7 @@ class MemberScore:                      # FR-4.* 통합 결과
 
 - **책임:** 정규화, 매핑, 가중치 적용, 스케일링 등의 하위 모듈들을 오케스트레이션하여 최종 산출물인 `MemberScore` 인스턴스 리스트를 생성하는 핵심 집계기이다. `AnalysisOrchestrator`(Controller)로부터 호출되며, None 소스는 `WeightRebalancer` 경유로 처리된다 (NFR-3.2).
 - **내부 의존:**
-  - `Normalizer` — 지표별 Min-Max 정규화
+  - `Normalizer` — 지표별 Max 정규화
   - `CappingScaler` — Git 추가 라인 Capping 및 로그 스케일
   - `AnomalySignalDetector` — 이상 신호 생성 (점수 미반영)
   - `WeightRebalancer` — 결측 소스 가중치 재조정
@@ -270,7 +270,7 @@ class MemberScore:                      # FR-4.* 통합 결과
   7. **종합 점수 산출:** 정규화된 점수에 보정된 가중치를 곱하여 `raw_total`을 계산한다: `raw_total = git_score * w_git + doc_score * w_doc + msg_score * w_msg`. 그 후 모든 팀원의 `raw_total` 합계를 구하고, 각 개인의 `raw_total`을 이 합계로 나누어 비례 정규화(Proportional Normalization)를 수행한다. 이로써 전체 팀원의 최종 `total_score` 합계가 항상 1.0(100%)이 되도록 보장한다.
   8. **[v1.7] 세부 축(dimensions) 산출:** 가용 소스마다 3개 세부 지표를 각각 `Normalizer.normalize()`로 0~1 정규화하여 `MemberScore.dimensions`에 담는다. Git은 `CommitStats`의 커밋 수/추가 라인(Capping+로그)/삭제 라인(로그)에서, 문서·메신저는 `doc_details`/`msg_details`가 주어진 경우에만 각 3지표를 산출한다(미주어지면 해당 소스 키 생략). 세부 축은 *표시 전용*으로 `total_score`에 반영하지 않는다(STR-7). 결측 소스 키는 포함하지 않아 가용 소스 수에 따라 3·6·9키가 된다.
   9. **MemberScore 조립:** 팀원별로 `MemberScore` 인스턴스를 생성하여 리스트로 반환한다.
-- **병합 재집계 경로 (FR-5.7, Controller Design v1.1 §6 연동):** 결과 화면에서 병합 요청이 발생하면, Controller가 `AliasMapper.merge(raw, new_mapping)` 결과를 입력으로 이 메서드를 재호출한다. [v1.7] `doc_details`/`msg_details`도 동일 매핑으로 병합해 함께 전달하므로 세부 축도 재산출된다. 병합 후 팀원 집합이 달라지면 Min-Max 정규화 기준이 재산출된다 (FR-4.1). 이것이 시각적 점수 합산이 아니라 재집계여야 하는 이유이다.
+- **병합 재집계 경로 (FR-5.7, Controller Design v1.1 §6 연동):** 결과 화면에서 병합 요청이 발생하면, Controller가 `AliasMapper.merge(raw, new_mapping)` 결과를 입력으로 이 메서드를 재호출한다. [v1.7] `doc_details`/`msg_details`도 동일 매핑으로 병합해 함께 전달하므로 세부 축도 재산출된다. 병합 후 팀원 집합이 달라지면 Max 정규화 기준이 재산출된다 (FR-4.1). 이것이 시각적 점수 합산이 아니라 재집계여야 하는 이유이다.
 - **출력 소비 방식 (INV-V1):** `aggregate()`의 반환값(`list[MemberScore]`)은 Controller(`AppController.on_analysis_completed`)에서 `dataclasses.asdict()`로 직렬화된 뒤 View에 전달된다. Model 레이어는 이 직렬화에 관여하지 않는다.
 
 ---

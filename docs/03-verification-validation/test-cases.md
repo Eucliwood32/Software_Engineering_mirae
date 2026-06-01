@@ -310,21 +310,21 @@ def test_stopword_deterministic():                         # TC-FR-3.3-04
 
 # FR-4. 분석 — 정규화·이상 신호·가중치
 
-## FR-4.1 Min-Max 정규화
+## FR-4.1 Max 정규화
 
 ### 계약
 ```python
 class Normalizer:                           # FR-4.1
     def normalize(self, values: list[float]) -> list[float]:
-        """(x-min)/(max-min). max==min → 전원 0.5. round(_,4). 결과 0.0~1.0."""
+        """x / max. max==0 → 전원 0.0. round(_,4). 결과 0.0~1.0."""
 ```
 
 | TC-ID | P | L | 입력 | 기대 | 근거 |
 | :-- | :- | :- | :-- | :-- | :-- |
 | TC-FR-4.1-01 | P0 | L1 | `[0,50,100]` | `[0.0, 0.5, 1.0]` | 기본 |
-| TC-FR-4.1-02 | P0 | L1 | `[75,75,75]` | `[0.5,0.5,0.5]`, ZeroDivisionError 없음 | 분산 0 |
+| TC-FR-4.1-02 | P0 | L1 | `[75,75,75]` | `[1.0,1.0,1.0]`, ZeroDivisionError 없음 | max==0 아님 |
 | TC-FR-4.1-03 | P0 | L1 | 임의 양수 리스트 | 모든 v: `0.0<=v<=1.0` | 범위 |
-| TC-FR-4.1-04 | P1 | L1 | `[1,2]` | `[0.0, 1.0]` | 2원소 |
+| TC-FR-4.1-04 | P1 | L1 | `[1,2]` | `[0.5, 1.0]` | 2원소 |
 | TC-FR-4.1-05 | P1 | L1 | `[10,20,30,40]` round 검증 | 각 값 소수점 4자리 | 반올림 |
 | TC-FR-4.1-06 | P2 | L1 | `[]` (빈 입력) | `[]`(또는 계약상 정의된 안전값), 예외 없음 | 경계 |
 
@@ -332,7 +332,8 @@ class Normalizer:                           # FR-4.1
 import pytest
 @pytest.mark.parametrize("inp,exp",[
     ([0,50,100],[0.0,0.5,1.0]),                            # TC-FR-4.1-01
-    ([75,75,75],[0.5,0.5,0.5]),                            # TC-FR-4.1-02
+    ([75,75,75],[1.0,1.0,1.0]),                            # TC-FR-4.1-02
+    ([0,0,0],[0.0,0.0,0.0]),                               # TC-FR-4.1-02 (zero max)
 ])
 def test_normalize(inp, exp):
     assert Normalizer().normalize(inp) == exp
@@ -415,7 +416,7 @@ def test_apply_drops_label_when_all_details_dismissed():       # TC-FR-4.2c-03
 | :-- | :- | :- | :-- | :-- | :-- |
 | TC-FR-4.2d-01 | P0 | L1 | 한 팀원 Git·문서 Z ≤ -1.5 (2개) | 그 팀원이 신호 리스트에 포함 | 2개 이상 조건 |
 | TC-FR-4.2d-02 | P0 | L1 | Z ≤ -1.5 가 1개뿐 | 신호 아님 | 임계 미달 |
-| TC-FR-4.2d-03 | P1 | L3 | 신호 팀원의 산점도 점 | 붉은색 + ⚠ 오버레이 강조 | FR-5.1c 연동 |
+| TC-FR-4.2d-03 | P1 | L3 | 신호 팀원의 산점도 점 | ⚠ 오버레이 강조 | FR-5.1c 연동 |
 
 ```python
 def test_zscore_two_low_axes():                            # TC-FR-4.2d-01
@@ -570,16 +571,16 @@ def test_weight_area_header_label(qtbot):                   # TC-FR-4.4-17
 
 | TC-ID | P | L | 검증 | 기대 |
 | :-- | :- | :- | :-- | :-- |
-| TC-FR-5.1c-01 | P0 | L3 | 축 | X="Git 점수"(0~1), Y="문서 점수"(0~1) |
-| TC-FR-5.1c-02 | P0 | L3 | 점 크기 매핑 | 메신저 0.0→40pt, 1.0→200pt 선형, ±5pt |
-| TC-FR-5.1c-03 | P0 | L3 | 메신저 결측 | 점 크기 80pt 고정 + 테두리 점선 |
-| TC-FR-5.1c-04 | P0 | L3 | 사분면 레이블 | 올라운더/개발집중/문서집중/저참여 4개, 색상 규칙 일치 |
-| TC-FR-5.1c-05 | P0 | L3 | 십자선 | X=Git평균±0.0001, Y=문서평균±0.0001, "팀 평균" 마커 |
+| TC-FR-5.1c-01 | P0 | L3 | 축 | 가용 데이터 수에 따라 동적 매핑(1개: 안내문구, 2~3개: 축 매핑) |
+| TC-FR-5.1c-02 | P0 | L3 | 3개 데이터 매핑 | 점 색상(채도)가 세 번째 데이터에 비례 |
+| TC-FR-5.1c-03 | P0 | L3 | 1개 데이터 결측(총 2개) | Y축 첫 번째/X축 두 번째, 색상 고정 |
+| TC-FR-5.1c-04 | P0 | L3 | 2개 데이터 결측(총 1개) | 차트 대신 "자료가 한 종류인 경우..." 텍스트 표시 |
+| TC-FR-5.1c-05 | P0 | L3 | 십자선 | X=동적평균±0.0001, Y=동적평균±0.0001, "팀 평균" 마커 |
 | TC-FR-5.1c-06 | P0 | L3 | 라벨 겹침 | 최소거리 ≥30px, 4방향 자동 조정 |
-| TC-FR-5.1c-07 | P0 | L3 | hover 9항목 | (목록은 RR FR-5.1c 참조) |
+| TC-FR-5.1c-07 | P0 | L3 | 동적 hover 툴팁 | 가용 소스 정규화/원시지표 동적 노출 |
 | TC-FR-5.1c-08 | P0 | L3 | 점 클릭 | `scatter_member_selected(str)` 발행 → 레이더 폴리곤 굵기 2배 1.5초 |
-| TC-FR-5.1c-09 | P0 | L3 | 하위이상치 점 | 붉은색 + ⚠ 오버레이 |
-| TC-FR-5.1c-10 | P1 | L3 | fade-in 애니 | 점 0→최종, 사분면 알파 0→최종 동시 |
+| TC-FR-5.1c-09 | P0 | L3 | 하위이상치 점 | 경고 ⚠ 오버레이 |
+| TC-FR-5.1c-10 | P1 | L3 | fade-in 애니 | 점 알파 및 색상 0→최종 동시 |
 
 ## FR-5.1d 차트 자동 검증 — **12개 pytest 케이스 (G4 게이트)**
 
@@ -593,12 +594,12 @@ def test_weight_area_header_label(qtbot):                   # TC-FR-4.4-17
 | 4 | `test_radar_vertex_labels` | 꼭짓점 "Git"/"문서"/"메신저" 정확 |
 | 5 | `test_radar_toggle_hide` | 범례 토글 후 폴리곤 visible=False |
 | 6 | `test_radar_missing_data` | 결측 시 "(제외됨)" 레이블 존재 |
-| 7 | `test_scatter_quadrant_labels` | 사분면 레이블 4개 존재 |
-| 8 | `test_scatter_dot_size_range` | 점 크기 40~200pt 범위 |
+| 7 | `test_scatter_dynamic_axes` | 데이터 개수에 따른 축/텍스트 표시 |
+| 8 | `test_scatter_dot_color_saturation` | 3개 소스일 때 그라데이션 보간 범위 검증 |
 | 9 | `test_scatter_signal_emission` | 클릭 시 Signal 발행(QSignalSpy) |
 | 10 | `test_scatter_label_overlap` | 라벨 최소거리 ≥30px |
-| 11 | `test_scatter_average_crosshair` | 십자선 X/Y == 평균 ±0.0001 |
-| 12 | `test_scatter_missing_messenger_size` | 메신저 결측 시 점 80pt 고정 |
+| 11 | `test_scatter_dynamic_crosshair` | 십자선 X/Y == 동적 축 평균 ±0.0001 |
+| 12 | `test_scatter_placeholder_text` | 1개 소스일 때 안내 텍스트 유무 검증 |
 
 ```python
 # tests/ui/test_chart_acceptance.py
@@ -664,7 +665,7 @@ def test_no_verdict_wording():                             # TC-FR-5.2-04
 | TC-FR-5.3-03 | P0 | L1 | csv(missing={"메신저"}) | 빈 행 후 "WARNING" 행 + 동일 문구 |
 | TC-FR-5.3-04 | P0 | L1 | missing 복수 {"Git","메신저"} | 결측 소스 각각 배너/경고 |
 | TC-FR-5.3-05 | P0 | L1 | missing=∅ | 배너·경고 미포함 |
-| TC-FR-5.3-06 | P1 | L3 | 산점도/레이더 | 결측 시각 표시(점선 등, FR-5.1b/c 참조) |
+| TC-FR-5.3-06 | P1 | L3 | 산점도/레이더 | 결측 상황에 따른 동적 시각 표시(FR-5.1b/c 참조) |
 
 ## FR-5.4 3-스크린 네비게이션
 

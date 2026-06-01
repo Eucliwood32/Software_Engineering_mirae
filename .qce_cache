@@ -1,62 +1,55 @@
 {
   "scores": [
     {
-      "author": "Alice",
+      "author": "이지은",
       "git_score": 0.0,
       "doc_score": 0.0,
-      "msg_score": 0.5,
-      "total_score": 0.3333,
+      "msg_score": 1.0,
+      "total_score": 0.2656,
       "raw_additions": 0,
       "raw_chars": 0,
-      "raw_messages": 1,
+      "raw_messages": 17,
       "capping_applied": false,
       "signals": [],
       "signal_details": [],
       "commit_dates": [],
       "dimensions": {
-        "msg_count": 0.5,
+        "git_commits": 0.0,
+        "git_additions": 0.0,
+        "git_deletions": 0.0,
+        "doc_chars": 0.0,
+        "doc_count": 0.0,
+        "doc_blocks": 0.0,
+        "msg_count": 1.0,
         "msg_chars": 1.0,
-        "msg_hours": 0.5
+        "msg_hours": 1.0
       }
     },
     {
-      "author": "Bob",
+      "author": "최민호",
       "git_score": 0.0,
-      "doc_score": 0.0,
-      "msg_score": 0.5,
-      "total_score": 0.3333,
+      "doc_score": 1.0,
+      "msg_score": 0.7647,
+      "total_score": 0.7344,
       "raw_additions": 0,
-      "raw_chars": 0,
-      "raw_messages": 1,
+      "raw_chars": 1044,
+      "raw_messages": 13,
       "capping_applied": false,
       "signals": [],
       "signal_details": [],
       "commit_dates": [],
       "dimensions": {
-        "msg_count": 0.5,
-        "msg_chars": 0.0833,
-        "msg_hours": 0.5
-      }
-    },
-    {
-      "author": "Charlie",
-      "git_score": 0.0,
-      "doc_score": 0.0,
-      "msg_score": 0.5,
-      "total_score": 0.3333,
-      "raw_additions": 0,
-      "raw_chars": 0,
-      "raw_messages": 1,
-      "capping_applied": false,
-      "signals": [],
-      "signal_details": [],
-      "commit_dates": [],
-      "dimensions": {
-        "msg_count": 0.5,
-        "msg_chars": 0.0,
-        "msg_hours": 0.5
+        "git_commits": 0.0,
+        "git_additions": 0.0,
+        "git_deletions": 0.0,
+        "doc_chars": 1.0,
+        "doc_count": 1.0,
+        "doc_blocks": 1.0,
+        "msg_count": 0.7647,
+        "msg_chars": 0.97,
+        "msg_hours": 0.6667
       }
     }
   ],
-  "timestamp": "now"
+  "timestamp": "now_merged"
 }

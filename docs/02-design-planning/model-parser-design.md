@@ -175,8 +175,8 @@ class ParseResult:                      # FR-3.2 — MessengerParser 출력
 
   | 용도 | 패턴 | 비고 |
   | :--- | :--- | :--- |
-  | 날짜 구분줄 | `r"^\d{4}년 \d{1,2}월 \d{1,2}일"` | 매칭 시 record 아님 → 정상 무시(skip 카운트 아님) |
-  | 발화 분리 | `r"^\[(?P<author>.+?)\] \[(?P<ap>오전\|오후) (?P<h>\d{1,2}):(?P<m>\d{2})\] (?P<msg>.*)$"` | `[작성자] [오전\|오후 H:MM] 메시지` 포맷. 시각은 24h로 변환하여 `MessengerRecord.timestamp`에 기록. |
+  | 날짜 구분줄 | `r"^(?:-+\s*)?\d{4}년 \d{1,2}월 \d{1,2}일"` | 매칭 시 record 아님 → 정상 무시(skip 카운트 아님) |
+  | 발화 분리 | `r"^\[(?P<author>.+?)\] \[(?:(?P<ap>오전\|오후) )?(?P<h>\d{1,2}):(?P<m>\d{2})\] ?(?P<msg>.*)$"` | `[작성자] [(오전\|오후) H:MM] 메시지` 및 `[작성자] [H:MM] 메시지` 포맷. 빈 메시지도 처리 가능. 시각은 24h로 변환하여 `MessengerRecord.timestamp`에 기록. |
 
   > **D-1 정합.** 브래킷 포맷은 실제 카카오톡 내보내기 파일의 표준 포맷이다. `specs/03`, test-plan §4.3 픽스처(`factories.py`), `qce/model/parsing/messenger_parser.py`, `src/models/parsers/messenger_parser.py` 모두 이 포맷으로 통일됐다.
 

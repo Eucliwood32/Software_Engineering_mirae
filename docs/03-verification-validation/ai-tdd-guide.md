@@ -386,9 +386,8 @@ widget.animation_done -> bool
 widget.vertex_labels() -> list[str]      # ["Git", "문서", "메신저"]
 
 # ScatterChartWidget
-widget.dot_size(author: str) -> float
-widget.quadrant_labels() -> list[str]    # 4개
-widget.crosshair() -> tuple[float, float] # (x_avg, y_avg)
+widget.dot_color_saturation(author: str) -> float
+widget.crosshair_xy() -> tuple[float, float] # (x_avg, y_avg)
 widget.simulate_point_click(index: int) -> None
 widget.member_selected: pyqtSignal(str)  # 클릭 시 발행
 ```
@@ -403,12 +402,12 @@ widget.member_selected: pyqtSignal(str)  # 클릭 시 발행
 # 4. test_radar_vertex_labels        — "Git"/"문서"/"메신저"
 # 5. test_radar_toggle_hide          — 범례 토글 후 visible=False
 # 6. test_radar_missing_data         — "(제외됨)" 레이블
-# 7. test_scatter_quadrant_labels    — 사분면 레이블 4개
-# 8. test_scatter_dot_size_range     — 40~200pt 범위
-# 9. test_scatter_signal_emission    — 클릭 시 Signal 발행 (QSignalSpy)
-# 10. test_scatter_label_overlap     — 라벨 최소거리 ≥30px
-# 11. test_scatter_average_crosshair — X/Y == 평균 ±0.0001
-# 12. test_scatter_missing_messenger_size — 메신저 결측 시 80pt 고정
+# 7. test_scatter_dynamic_axes        — 데이터 개수에 따른 축/텍스트 표시
+# 8. test_scatter_dot_color_saturation — 3개 소스일 때 색상 채도 범위 검증
+# 9. test_scatter_signal_emission     — 클릭 시 Signal 발행 (QSignalSpy)
+# 10. test_scatter_label_overlap      — 라벨 최소거리 ≥30px
+# 11. test_scatter_dynamic_crosshair  — X/Y == 동적 축 평균 ±0.0001
+# 12. test_scatter_placeholder_text   — 1개 소스일 때 안내 텍스트 유무 검증
 ```
 
 ---

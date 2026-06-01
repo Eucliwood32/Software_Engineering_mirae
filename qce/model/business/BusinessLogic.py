@@ -61,19 +61,18 @@ class MemberScore:
 # ==========================================
 
 class Normalizer:
-    """FR-4.1: 이질적 단위 지표를 0.0~1.0 척도로 변환 (Min-Max 정규화)"""
+    """FR-4.1: 이질적 단위 지표를 0.0~1.0 척도로 변환 (Max 정규화)"""
     def normalize(self, values: List[float]) -> List[float]:
         if not values:
             return []
         
-        val_min = min(values)
         val_max = max(values)
         
-        # ZeroDivisionError 방지 및 분산이 없는 경우 전원 0.5 처리
-        if val_min == val_max:
-            return [0.5] * len(values)
+        # ZeroDivisionError 방지
+        if val_max == 0:
+            return [0.0] * len(values)
             
-        return [round((v - val_min) / (val_max - val_min), 4) for v in values]
+        return [round(v / val_max, 4) for v in values]
 
 
 class CappingScaler:

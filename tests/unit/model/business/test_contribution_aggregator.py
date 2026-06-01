@@ -62,12 +62,12 @@ def test_doc_details_absent_omits_doc_keys():
         assert not (DOC_KEYS & set(s.dimensions))
 
 
-def test_single_member_dimensions_are_midpoint():
-    """팀원 1명이면 Min-Max 정규화 결과가 0.5(분산 0) — 폴리곤이 정상 형성된다."""
+def test_single_member_dimensions_are_max():
+    """팀원 1명이면 Max 정규화 결과가 1.0 (자신의 값이 최대값이므로)."""
     git = {"A": CommitStats(3, 100, 10)}
     result = _agg().aggregate(git=git, docs=None, msgs=None, weights=WEIGHTS)
     assert result[0].dimensions == {
-        "git_commits": 0.5, "git_additions": 0.5, "git_deletions": 0.5,
+        "git_commits": 1.0, "git_additions": 1.0, "git_deletions": 1.0,
     }
 
 

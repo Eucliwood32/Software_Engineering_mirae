@@ -165,7 +165,7 @@ Controller 레이어는 크게 전역 상태와 라우팅을 담당하는 `AppCo
 3. **식별자 통합 (FR-1.3 개정):**
    - **1차 분석:** `AliasMapper`에 **항등 매핑**을 전달하여 각 식별자를 독립 인물로 산출한다. 분석-전 매핑 모달(alias_mapping_requested)은 폐기되었다.
    - **병합 재집계(FR-5.7):** 결과 화면에서 조장이 병합 매핑을 제출하면 파서를 재실행하지 않고, 보유 중인 원시 지표에 새 매핑을 적용해 `AliasMapper.merge(raw, mapping)` → `ContributionAggregator.aggregate(...)` 경로를 재실행한다. (§6 참조)
-4. **집계 및 스케일링:** `ContributionAggregator`를 호출하여 Capping, Min-Max 정규화, `WeightRebalancer`를 통한 가중치 재조정 수행. (1차 분석과 병합 재집계 모두 동일 경로)
+4. **집계 및 스케일링:** `ContributionAggregator`를 호출하여 Capping, Max 정규화, `WeightRebalancer`를 통한 가중치 재조정 수행. (1차 분석과 병합 재집계 모두 동일 경로)
 5. **캐싱 및 반환:** 최종 결과 도출 시 `CacheManager.save()` 호출 후 `completed` Signal을 통해 `AppController`로 `MemberScore` 목록 반환 (NFR-2.3). `AppController`가 `dataclasses.asdict()`로 직렬화 후 `ResultScreen.render`에 전달 (INV-V1).
 
 ---
@@ -212,7 +212,7 @@ ResultScreen.merge_requested(mapping={alias → member})
 ```
 
 ### 설계 불변식
-- **재정규화 필수 (FR-4.1):** 병합으로 팀원 집합이 바뀌면 Min-Max 정규화 기준이 달라진다. 시각적 점수 합산이 아니라 `ContributionAggregator.aggregate` 재실행이 필요하다.
+- **재정규화 필수 (FR-4.1):** 병합으로 팀원 집합이 바뀌면 Max 정규화 기준이 달라진다. 시각적 점수 합산이 아니라 `ContributionAggregator.aggregate` 재실행이 필요하다.
 - **원시 지표 보존:** Orchestrator는 1차 분석에서 수집한 `{alias: CommitStats}`, `{alias: chars}`, `{alias: messages}` 원시 지표를 세션 내내 보유한다. 병합은 파서를 다시 실행하지 않는다.
 - **결정론 (NFR-1.3):** 동일 병합 매핑 + 동일 원시 지표 = 동일 결과.
 - **분리(병합 취소):** 매핑을 갱신하여 동일 재집계 경로로 처리.

@@ -246,7 +246,7 @@ Controller가 push하는 dict는 아래 키·타입을 정확히 만족한다. V
 > - **문서:** `doc_chars`(유효 글자수) · `doc_count`(작성 문서 수) · `doc_blocks`(문단·도형 등 구성 요소 수)
 > - **메신저:** `msg_count`(발화 수) · `msg_chars`(발화 글자수) · `msg_hours`(활동 시간대 수, distinct HH)
 >
-> 각 값은 팀원 집합 전체에 대한 Min-Max 정규화 결과(0.0~1.0)다(단일 팀원이면 0.5). 모든 세부 지표는 *표시 전용*이며 `total_score`에는 기존 `git_score/doc_score/msg_score`만 반영된다(STR-7 유지). 산출은 Model(`ContributionAggregator`) 책임이다.
+> 각 값은 팀원 집합 전체에 대한 Max 정규화 결과(0.0~1.0)다(단일 팀원이면 1.0). 모든 세부 지표는 *표시 전용*이며 `total_score`에는 기존 `git_score/doc_score/msg_score`만 반영된다(STR-7 유지). 산출은 Model(`ContributionAggregator`) 책임이다.
 
 **식별자 dict** (`AliasMappingDialog.populate`의 원소, FR-1.3)
 
@@ -652,33 +652,27 @@ class RadarChartWidget(BaseChartWidget):
 ```
 
 ### 7.4 ScatterChartWidget `scatter_chart.py` (~390) — FR-5.1c
-**[v1.8] 사분면 기준점 고정.** X=Git, Y=문서, 점 크기=메신저(40~200pt 선형), **사분면 4색+레이블(기준점 항상 0.5, 0.5)**, 십자선(0.5, 0.5 고정), 9항목 툴팁, 라벨 겹침 4방향 해소, fade-in 애니메이션, 하위 이상치 점 붉은색+⚠. 점 크기 및 사분면 배경은 진행(progress)에 맞춰 fade-in한다(유명 팀원이 우상에 몰리는 착각 방지). **점 클릭 시 `member_selected(author)` 발행**(결정 B; 누가 듣는지 모름).
+**[v2.1] 가용 데이터 수 기반 동적 산점도.** 입력 데이터 개수에 따라 표시 방식이 변한다: (1개) 회색 텍스트 "자료가 한 종류인 경우 산점도가 계산되지 않습니다." 표시, (2개) Y축 첫 번째/X축 두 번째 소스, (3개) Y축 첫 번째/X축 두 번째 소스 + 점 색상 세 번째 소스 점수 비례(노란색부터 보라색까지의 그라데이션) 및 우측 컬러바 범례 표시. 십자선(해당 축 평균, axvline/axhline 사용), 동적 툴팁, 라벨 겹침 4방향 해소, fade-in 애니메이션, 하위 이상치 점 경고 표시. **점 클릭 시 `member_selected(author)` 발행**(결정 B; 누가 듣는지 모름).
 
 ```python
 class ScatterChartWidget(BaseChartWidget):
     member_selected = pyqtSignal(str)
-    DOT_MIN, DOT_MAX = 40.0, 200.0
-    DOT_MISSING = 80.0                  # 메신저 결측 시 고정
-    QUADRANTS = {"올라운더": "연초록", "개발 집중": "연파랑",
-                 "문서 집중": "연주황", "저참여": "연회색"}
+    DOT_SIZE = 80.0                     # 점 크기 고정
 
     def render(self, scores: list[dict], missing: set[str]) -> None: ...
     def _draw_frame(self, progress: float) -> None:
-        """점 크기 = 최종크기 * progress, 사분면 배경 알파 = 최종 * progress."""
-    def _draw_quadrants(self) -> None: ...
+        """점의 불투명도(알파) = 최종 * progress."""
     def _resolve_label_overlap(self) -> None:
         """라벨 간 <30px이면 상/하/좌/우 순 재배치, 모두 겹치면 최소 겹침 방향."""
     def _on_pick(self, event) -> None:
         """점 클릭 → member_selected 발행 (애니 중이면 무시, INV-V5)."""
     def _build_tooltip(self, m: dict) -> str:
-        """[개선] 9항목: 팀원명/Git 정규화/Git 원시(추가 라인)/Capping/문서 정규화/문서 원시(글자수)/
-           메신저 정규화/메신저 원시(발화 수)/종합. 강조 여부는 m[K_ANOMALY]로 판단."""
+        """[개선] 가용 데이터 소스별 정규화 및 원시 지표 + 종합 지표 동적 포함.
+           강조 여부는 m[K_ANOMALY]로 판단."""
     # --- 테스트 접근자 ---
+    def dot_color_saturation(self, author: str) -> float: ...# 3개 소스일 때 그라데이션 보간 비율(0~1)
     @property
-    def quadrant_labels(self) -> list[str]: ...              # test_scatter_quadrant_labels (4개)
-    def dot_size(self, author: str) -> float: ...            # test_scatter_dot_size_range / missing(80)
-    @property
-    def crosshair_xy(self) -> tuple[float, float]: ...       # 항상 (0.5, 0.5). test_scatter_crosshair_at_center
+    def crosshair_xy(self) -> tuple[float, float]: ...       # 동적 평균 중심.
     def min_label_distance(self) -> float: ...               # test_scatter_label_overlap (≥30)
 ```
 

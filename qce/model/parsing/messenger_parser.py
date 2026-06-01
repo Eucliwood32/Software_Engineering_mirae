@@ -6,10 +6,10 @@ from qce.model.parsing.encoding_handler import EncodingHandler
 
 # 발화줄 패턴 (test-plan §4.3)
 _MSG_RE = re.compile(
-    r"^\[(?P<author>.+?)\] \[(?P<ap>오전|오후) (?P<h>\d{1,2}):(?P<m>\d{2})\] (?P<msg>.*)$"
+    r"^\[(?P<author>.+?)\] \[(?:(?P<ap>오전|오후) )?(?P<h>\d{1,2}):(?P<m>\d{2})\] ?(?P<msg>.*)$"
 )
 # 날짜 구분줄 패턴
-_DATE_RE = re.compile(r"^\d{4}년 \d{1,2}월 \d{1,2}일")
+_DATE_RE = re.compile(r"^(?:-+\s*)?\d{4}년 \d{1,2}월 \d{1,2}일")
 
 
 class MessengerParser:

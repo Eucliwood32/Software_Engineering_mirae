@@ -170,7 +170,7 @@ flowchart LR
 | BaseChartWidget | View | 이대한 | 차트 공통 추상(렌더·placeholder 텍스트 갱신·애니메이션 훅) | FR-5.1 |
 | BarChartWidget | View | 이대한 | 막대 차트·원시 데이터(Raw) 노출 툴팁·평균선 | FR-5.1a |
 | RadarChartWidget | View | 이대한 | 레이더 차트·범례 토글·평균 폴리곤 | FR-5.1b |
-| ScatterChartWidget | View | 이대한 | 산점도·사분면·십자선·클릭 연동·원시 데이터 노출 툴팁 | FR-5.1c |
+| ScatterChartWidget | View | 이대한 | 가용 데이터별 동적 산점도·십자선·클릭 연동·원시 데이터 노출 툴팁 | FR-5.1c |
 | WarningBanner | View | 이대한 | 결측 경고 배너 | FR-5.3 |
 | ProgressBar | View | 이대한 | 진행률 표시 | NFR-1.1 |
 | SaveReportDialog | View | 이대한 | 저장 경로·형식 선택 | FR-5.2 |
@@ -182,7 +182,7 @@ flowchart LR
 | MessengerParser | Model·Parse | 조원희 | 카톡 .txt 파싱·오염 줄 skip (단독 파이프라인 분석 보장) | FR-3.1, FR-3.2 |
 | StopwordFilter | Model·Parse | 조원희 | 자동 불용어 분류(NLP) | FR-3.3 |
 | EncodingHandler | Model·Parse | 조원희 | UTF-8→CP949 자동 감지 | NFR-3.1 |
-| Normalizer | Model·BL | 김휘중 | Min-Max 정규화 | FR-4.1 |
+| Normalizer | Model·BL | 김휘중 | Max 정규화 | FR-4.1 |
 | CappingScaler | Model·BL | 김휘중 | Capping·로그 스케일 | FR-4.2 |
 | AnomalySignalDetector | Model·BL | 김휘중 | Capping·EW-02 빈도·Z-Score 신호(표시 전용) | FR-4.2, FR-4.2b, FR-4.2d |
 | NormalizedSignalsTracker | Model·BL | 김휘중 | 신호 "정상 표시" 예외(세션 한정) | FR-4.2c |
@@ -228,7 +228,7 @@ classDiagram
     BaseChartWidget <|-- ScatterChartWidget
 ```
 
-*Fallback 캡션: BaseChartWidget(추상)이 render/show_placeholder('분석할 데이터가 없습니다.' 안내 갱신)/clear 공개 메서드와 _animate_in/_build_tooltip(원시 데이터 포함) 보호 메서드를 정의한다. BarChartWidget·RadarChartWidget·ScatterChartWidget이 이를 상속하며, 각자 고유 메서드(막대 평균선, 레이더 토글, 산점도 사분면·라벨 겹침 해소)와 ScatterChartWidget의 member_selected Signal을 추가한다.*
+*Fallback 캡션: BaseChartWidget(추상)이 render/show_placeholder('분석할 데이터가 없습니다.' 안내 갱신)/clear 공개 메서드와 _animate_in/_build_tooltip(원시 데이터 포함) 보호 메서드를 정의한다. BarChartWidget·RadarChartWidget·ScatterChartWidget이 이를 상속하며, 각자 고유 메서드(막대 평균선, 레이더 토글, 산점도 라벨 겹침 해소)와 ScatterChartWidget의 member_selected Signal을 추가한다.*
 
 ---
 
@@ -571,3 +571,4 @@ stateDiagram-v2
 | **v1.2** | **2026-05-31** | **3-스크린 구조(FR-5.4)·결과 화면 계정 병합(FR-5.7) 반영(RR v1.4·view-design v1.3 동기화). (1) 상위 문서 참조를 RR v1.4·ConOps v1.3로 갱신. (2) §4.1 View 컴포넌트 다이어그램에 SubmitScreen·LoadingScreen·ResultScreen 추가, MainWindow를 QStackedWidget 셸로·AliasMappingDialog를 결과 병합으로 표기. (3) §4.2 책임표에 3-스크린 행 추가, MainWindow(FR-5.4)·AliasMappingDialog(FR-1.3/5.7)·AnalysisPanel(SubmitScreen 합성) 갱신. (4) §5.5 View 시그니처에 MainWindow 화면 전환·SubmitScreen·ResultScreen(merge_requested) 클래스 추가, 차트 render를 list[dict] 소비로 정정, 경계 dict 계약 주석 추가. (5) §7 데이터 흐름에 신원 병합(분석-후 재집계) 흐름 문단 추가. (6) §9 RTM에 3-스크린 행 추가·AliasMappingDialog에 FR-5.7 연결. Controller 레이어 상세(병합 재집계 오케스트레이션)는 controller-design.md 담당자 갱신 대상으로 남김.** | QCE 개발팀 (이대한) |
 | **v1.3** | **2026-05-31** | **구 SRS.md 폐지에 따른 정합화 및 구현분(A1~A4) 반영. (1) 상위 문서 참조에서 폐지된 SRS v2.2 제거, RR v1.5로 갱신. (2) §5.1 공용 타입을 실제 코드와 일치화: `CommitStats.commits_list` 추가, MemberScore 필드명 정정(`raw_chars`·`raw_messages`·`signals`) 및 `signal_details`·`commit_dates` 추가. (3) §4.2 컴포넌트 표·§5 시그니처·§9 RTM에 NormalizedSignalsTracker(FR-4.2c 예외)·AliasExtractor(FR-1.3) 추가, AnomalySignalDetector에 detect_capping/detect_zscore_detail/build_signal_details, WeightPresetManager에 redistribute 반영, AnomalySignalDetector 실현 FR에 FR-4.2·FR-4.2d 명시(번호 체계: 4.2c=예외·4.2d=Z-Score, RR v1.5 정합). 상세는 model-business-logic-design v1.3·view-design v1.4 참조.** | QCE 개발팀 |
 | v1.4 | 2026-06-01 | 사용자 피드백(UI/UX 개선 및 버그 수정) 반영: AppController 세션 초기화 메서드(reset_session), SubmitScreen 입력 초기화(clear_inputs) 및 파일명("없음" 포함) 노출 추가, AnalysisPanel 실시간 연동/수치 표기/가이드 문구 추가, ResultScreen 매핑 방어 로직 명시, BaseChartWidget placeholder 텍스트 갱신, 차트 위젯 원시 데이터(Raw Data) 노출 추가 명문화. | QCE 개발팀 |
+| **v1.5** | **2026-06-02** | **사용자 피드백 반영(산점도 시각화 개선): 3개 소스 입력 시 산점도의 세 번째 데이터 크기(Z축)를 단순 투명도(채도) 조절에서 색상 그라데이션 보간 방식으로 변경 명시.** | QCE 개발팀 |

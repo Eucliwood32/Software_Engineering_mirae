@@ -69,9 +69,13 @@ def test_partial_source_still_completes(orchestrator, qtbot, git_repo):
 
     scores = blocker.args[0]
     assert scores
-    # git만 가용 → 종합 점수 = git 정규화 점수
+    # FR-4.1 (v1.6) 비례 정규화에 의해 total_score 합계는 1.0이 된다.
+    total_sum = sum(s.total_score for s in scores)
+    assert abs(total_sum - 1.0) < 1e-4
+    
     for s in scores:
-        assert abs(s.total_score - s.git_score) < 1e-6
+        expected_total = s.git_score / sum(x.git_score for x in scores)
+        assert abs(s.total_score - expected_total) < 1e-4
 
 
 def test_merge_reaggregation_after_analysis(orchestrator, qtbot, tmp_docx, git_repo, katalk):

@@ -1,5 +1,5 @@
 """
-FR-4.1 Min-Max 정규화 단위 테스트 (L1)
+FR-4.1 Max 정규화 단위 테스트 (L1)
 TC-FR-4.1-01 ~ TC-FR-4.1-06
 """
 import pytest
@@ -8,15 +8,16 @@ from qce.model.business.normalizer import Normalizer
 
 @pytest.mark.parametrize("inp,exp", [
     ([0, 50, 100], [0.0, 0.5, 1.0]),         # TC-FR-4.1-01 기본
-    ([75, 75, 75], [0.5, 0.5, 0.5]),          # TC-FR-4.1-02 분산 0
+    ([75, 75, 75], [1.0, 1.0, 1.0]),         # TC-FR-4.1-02 모두 같을 때
+    ([0, 0, 0], [0.0, 0.0, 0.0]),            # max가 0일 때
 ])
 def test_normalize_basic(inp, exp):
     assert Normalizer().normalize(inp) == exp
 
 
-def test_normalize_zero_variance_no_exception():  # TC-FR-4.1-02
-    result = Normalizer().normalize([42, 42, 42])
-    assert result == [0.5, 0.5, 0.5]
+def test_normalize_zero_max_no_exception():  # TC-FR-4.1-02
+    result = Normalizer().normalize([0, 0, 0])
+    assert result == [0.0, 0.0, 0.0]
 
 
 def test_normalize_range():                        # TC-FR-4.1-03
@@ -28,7 +29,7 @@ def test_normalize_range():                        # TC-FR-4.1-03
 
 
 def test_normalize_two_elements():                 # TC-FR-4.1-04
-    assert Normalizer().normalize([1, 2]) == [0.0, 1.0]
+    assert Normalizer().normalize([1, 2]) == [0.5, 1.0]
 
 
 def test_normalize_rounding():                     # TC-FR-4.1-05
