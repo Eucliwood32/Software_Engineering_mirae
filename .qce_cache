@@ -1,84 +1,58 @@
 {
   "scores": [
     {
-      "author": "박서준",
+      "author": "20221985@edu.hanbat.ac.kr",
+      "git_score": 0.6545,
+      "doc_score": 0.0,
+      "msg_score": 0.0,
+      "total_score": 0.085,
+      "raw_additions": 91,
+      "raw_chars": 0,
+      "raw_messages": 0,
+      "capping_applied": false,
+      "signals": [],
+      "signal_details": [],
+      "commit_dates": [
+        "2026-05-26 23:58:27 +0900",
+        "2026-05-27 20:41:10 +0900",
+        "2026-05-27 20:50:13 +0900",
+        "2026-05-27 20:53:14 +0900",
+        "2026-05-27 20:54:56 +0900",
+        "2026-05-27 20:55:27 +0900",
+        "2026-05-28 18:02:14 +0900"
+      ],
+      "dimensions": {
+        "git_commits": 0.2593,
+        "git_additions": 0.6545,
+        "git_deletions": 0.244,
+        "doc_chars": 0.0,
+        "doc_count": 0.0,
+        "doc_blocks": 0.0,
+        "msg_count": 0.0,
+        "msg_chars": 0.0,
+        "msg_hours": 0.0
+      }
+    },
+    {
+      "author": "20247142@edu.hanbat.ac.kr",
       "git_score": 1.0,
-      "doc_score": 0.5805,
-      "msg_score": 1.0,
-      "total_score": 0.3151,
-      "raw_additions": 10869,
-      "raw_chars": 606,
-      "raw_messages": 19,
+      "doc_score": 0.0,
+      "msg_score": 0.0,
+      "total_score": 0.1299,
+      "raw_additions": 9155,
+      "raw_chars": 0,
+      "raw_messages": 0,
       "capping_applied": true,
       "signals": [
         "CAPPING"
       ],
       "signal_details": [
         {
-          "hash": "91e431a",
-          "date": "2026-06-02 05:37:32 +0900",
-          "additions": 5943,
+          "hash": "44961bf",
+          "date": "2026-06-02 07:08:14 +0900",
+          "additions": 1525,
           "type": "CAPPING"
-        }
-      ],
-      "commit_dates": [
-        "2026-05-26 23:58:27 +0900",
-        "2026-05-27 02:02:09 +0900",
-        "2026-05-27 20:41:10 +0900",
-        "2026-05-27 20:50:13 +0900",
-        "2026-05-27 20:53:14 +0900",
-        "2026-05-27 20:54:56 +0900",
-        "2026-05-27 20:55:27 +0900",
-        "2026-05-28 01:49:37 +0900",
-        "2026-05-28 02:10:11 +0900",
-        "2026-05-28 18:02:14 +0900",
-        "2026-05-29 22:03:41 +0900",
-        "2026-05-30 00:11:09 +0900",
-        "2026-05-30 01:03:06 +0900",
-        "2026-05-30 01:12:39 +0900",
-        "2026-05-31 01:06:50 +0900",
-        "2026-05-31 01:50:19 +0900",
-        "2026-05-31 02:05:25 +0900",
-        "2026-05-31 02:24:11 +0900",
-        "2026-06-01 02:06:27 +0900",
-        "2026-06-01 02:40:59 +0900",
-        "2026-06-01 02:54:23 +0900",
-        "2026-06-01 03:38:01 +0900",
-        "2026-06-01 21:47:27 +0900",
-        "2026-06-01 22:00:04 +0900",
-        "2026-06-01 22:23:53 +0900",
-        "2026-06-01 22:43:13 +0900",
-        "2026-06-01 23:01:56 +0900",
-        "2026-06-02 00:40:33 +0900",
-        "2026-06-02 01:32:26 +0900",
-        "2026-06-02 05:37:32 +0900"
-      ],
-      "dimensions": {
-        "git_commits": 1.0,
-        "git_additions": 1.0,
-        "git_deletions": 0.6987,
-        "doc_chars": 0.5805,
-        "doc_count": 0.5,
-        "doc_blocks": 0.5714,
-        "msg_count": 1.0,
-        "msg_chars": 1.0,
-        "msg_hours": 1.0
-      }
-    },
-    {
-      "author": "이지은",
-      "git_score": 1.0,
-      "doc_score": 0.7337,
-      "msg_score": 0.7368,
-      "total_score": 0.3183,
-      "raw_additions": 7630,
-      "raw_chars": 766,
-      "raw_messages": 14,
-      "capping_applied": true,
-      "signals": [
-        "CAPPING"
-      ],
-      "signal_details": [
+        },
         {
           "hash": "1f8ab11",
           "date": "2026-05-30 07:03:51 +0900",
@@ -118,33 +92,144 @@
         "2026-06-01 23:50:53 +0900",
         "2026-06-02 00:27:33 +0900",
         "2026-06-02 04:28:52 +0900",
-        "2026-06-02 05:44:03 +0900"
+        "2026-06-02 05:44:03 +0900",
+        "2026-06-02 07:08:14 +0900"
       ],
       "dimensions": {
-        "git_commits": 0.8667,
+        "git_commits": 1.0,
         "git_additions": 1.0,
-        "git_deletions": 0.5666,
-        "doc_chars": 0.7337,
-        "doc_count": 0.5,
-        "doc_blocks": 1.0,
-        "msg_count": 0.7368,
-        "msg_chars": 0.4895,
-        "msg_hours": 0.8571
+        "git_deletions": 0.5924,
+        "doc_chars": 0.0,
+        "doc_count": 0.0,
+        "doc_blocks": 0.0,
+        "msg_count": 0.0,
+        "msg_chars": 0.0,
+        "msg_hours": 0.0
       }
     },
     {
-      "author": "정유나",
+      "author": "96867796+Eucliwood32@users.noreply.github.com",
+      "git_score": 0.4407,
+      "doc_score": 0.0,
+      "msg_score": 0.0,
+      "total_score": 0.0572,
+      "raw_additions": 20,
+      "raw_chars": 0,
+      "raw_messages": 0,
+      "capping_applied": false,
+      "signals": [],
+      "signal_details": [],
+      "commit_dates": [
+        "2026-05-26 10:21:53 +0900",
+        "2026-05-26 11:14:17 +0900"
+      ],
+      "dimensions": {
+        "git_commits": 0.0741,
+        "git_additions": 0.4407,
+        "git_deletions": 0.0585,
+        "doc_chars": 0.0,
+        "doc_count": 0.0,
+        "doc_blocks": 0.0,
+        "msg_count": 0.0,
+        "msg_chars": 0.0,
+        "msg_hours": 0.0
+      }
+    },
+    {
+      "author": "Jieun Lee",
+      "git_score": 0.0,
+      "doc_score": 0.7337,
+      "msg_score": 0.0,
+      "total_score": 0.0953,
+      "raw_additions": 0,
+      "raw_chars": 766,
+      "raw_messages": 0,
+      "capping_applied": false,
+      "signals": [],
+      "signal_details": [],
+      "commit_dates": [],
+      "dimensions": {
+        "git_commits": 0.0,
+        "git_additions": 0.0,
+        "git_deletions": 0.0,
+        "doc_chars": 0.7337,
+        "doc_count": 0.5,
+        "doc_blocks": 1.0,
+        "msg_count": 0.0,
+        "msg_chars": 0.0,
+        "msg_hours": 0.0
+      }
+    },
+    {
+      "author": "gnlwnd40@gmail.com",
       "git_score": 1.0,
       "doc_score": 0.0,
-      "msg_score": 0.1579,
-      "total_score": 0.1634,
-      "raw_additions": 148404,
+      "msg_score": 0.0,
+      "total_score": 0.1299,
+      "raw_additions": 10778,
       "raw_chars": 0,
-      "raw_messages": 3,
+      "raw_messages": 0,
       "capping_applied": true,
       "signals": [
-        "CAPPING",
-        "ZSCORE"
+        "CAPPING"
+      ],
+      "signal_details": [
+        {
+          "hash": "91e431a",
+          "date": "2026-06-02 05:37:32 +0900",
+          "additions": 5943,
+          "type": "CAPPING"
+        }
+      ],
+      "commit_dates": [
+        "2026-05-27 02:02:09 +0900",
+        "2026-05-28 01:49:37 +0900",
+        "2026-05-28 02:10:11 +0900",
+        "2026-05-29 22:03:41 +0900",
+        "2026-05-30 00:11:09 +0900",
+        "2026-05-30 01:03:06 +0900",
+        "2026-05-30 01:12:39 +0900",
+        "2026-05-31 01:06:50 +0900",
+        "2026-05-31 01:50:19 +0900",
+        "2026-05-31 02:05:25 +0900",
+        "2026-05-31 02:24:11 +0900",
+        "2026-06-01 02:06:27 +0900",
+        "2026-06-01 02:40:59 +0900",
+        "2026-06-01 02:54:23 +0900",
+        "2026-06-01 03:38:01 +0900",
+        "2026-06-01 21:47:27 +0900",
+        "2026-06-01 22:00:04 +0900",
+        "2026-06-01 22:23:53 +0900",
+        "2026-06-01 22:43:13 +0900",
+        "2026-06-01 23:01:56 +0900",
+        "2026-06-02 00:40:33 +0900",
+        "2026-06-02 01:32:26 +0900",
+        "2026-06-02 05:37:32 +0900"
+      ],
+      "dimensions": {
+        "git_commits": 0.8519,
+        "git_additions": 1.0,
+        "git_deletions": 0.6983,
+        "doc_chars": 0.0,
+        "doc_count": 0.0,
+        "doc_blocks": 0.0,
+        "msg_count": 0.0,
+        "msg_chars": 0.0,
+        "msg_hours": 0.0
+      }
+    },
+    {
+      "author": "wonhui32@gmail.com",
+      "git_score": 1.0,
+      "doc_score": 0.0,
+      "msg_score": 0.0,
+      "total_score": 0.1299,
+      "raw_additions": 148384,
+      "raw_chars": 0,
+      "raw_messages": 0,
+      "capping_applied": true,
+      "signals": [
+        "CAPPING"
       ],
       "signal_details": [
         {
@@ -176,18 +261,9 @@
           "date": "2026-05-27 19:56:48 +0900",
           "additions": 1346,
           "type": "CAPPING"
-        },
-        {
-          "metrics": [
-            "doc",
-            "msg"
-          ],
-          "type": "ZSCORE"
         }
       ],
       "commit_dates": [
-        "2026-05-26 10:21:53 +0900",
-        "2026-05-26 11:14:17 +0900",
         "2026-05-27 02:14:39 +0900",
         "2026-05-27 03:01:28 +0900",
         "2026-05-27 03:09:22 +0900",
@@ -213,9 +289,84 @@
         "2026-06-02 02:33:25 +0900"
       ],
       "dimensions": {
-        "git_commits": 0.8333,
+        "git_commits": 0.8519,
         "git_additions": 1.0,
         "git_deletions": 1.0,
+        "doc_chars": 0.0,
+        "doc_count": 0.0,
+        "doc_blocks": 0.0,
+        "msg_count": 0.0,
+        "msg_chars": 0.0,
+        "msg_hours": 0.0
+      }
+    },
+    {
+      "author": "박서준",
+      "git_score": 0.0,
+      "doc_score": 0.5805,
+      "msg_score": 1.0,
+      "total_score": 0.1403,
+      "raw_additions": 0,
+      "raw_chars": 606,
+      "raw_messages": 19,
+      "capping_applied": false,
+      "signals": [],
+      "signal_details": [],
+      "commit_dates": [],
+      "dimensions": {
+        "git_commits": 0.0,
+        "git_additions": 0.0,
+        "git_deletions": 0.0,
+        "doc_chars": 0.5805,
+        "doc_count": 0.5,
+        "doc_blocks": 0.5714,
+        "msg_count": 1.0,
+        "msg_chars": 1.0,
+        "msg_hours": 1.0
+      }
+    },
+    {
+      "author": "이지은",
+      "git_score": 0.0,
+      "doc_score": 0.0,
+      "msg_score": 0.7368,
+      "total_score": 0.0479,
+      "raw_additions": 0,
+      "raw_chars": 0,
+      "raw_messages": 14,
+      "capping_applied": false,
+      "signals": [],
+      "signal_details": [],
+      "commit_dates": [],
+      "dimensions": {
+        "git_commits": 0.0,
+        "git_additions": 0.0,
+        "git_deletions": 0.0,
+        "doc_chars": 0.0,
+        "doc_count": 0.0,
+        "doc_blocks": 0.0,
+        "msg_count": 0.7368,
+        "msg_chars": 0.4895,
+        "msg_hours": 0.8571
+      }
+    },
+    {
+      "author": "정유나",
+      "git_score": 0.0,
+      "doc_score": 0.0,
+      "msg_score": 0.1579,
+      "total_score": 0.0103,
+      "raw_additions": 0,
+      "raw_chars": 0,
+      "raw_messages": 3,
+      "capping_applied": false,
+      "signals": [],
+      "signal_details": [],
+      "commit_dates": [],
+      "dimensions": {
+        "git_commits": 0.0,
+        "git_additions": 0.0,
+        "git_deletions": 0.0,
         "doc_chars": 0.0,
         "doc_count": 0.0,
         "doc_blocks": 0.0,
@@ -229,7 +380,7 @@
       "git_score": 0.0,
       "doc_score": 1.0,
       "msg_score": 0.6842,
-      "total_score": 0.2032,
+      "total_score": 0.1743,
       "raw_additions": 0,
       "raw_chars": 1044,
       "raw_messages": 13,
@@ -250,5 +401,5 @@
       }
     }
   ],
-  "timestamp": "now_merged"
+  "timestamp": "now"
 }
