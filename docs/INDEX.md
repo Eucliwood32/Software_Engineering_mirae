@@ -23,17 +23,14 @@
 - `test-plan.md`: 단위 테스트(Model 우선) 및 통합/수동 테스트 계획
 - `test-cases.md`: 주요 기능(FR) 및 제약사항(NFR) 합격 기준표
 
-### `04-risk-management/` (위험 관리)
-- `risk-register.md`: 프로젝트 진행 간 발생 가능한 리스크 및 완화 계획
+### `04-implementation/` (구현 및 배포 가이드)
+- `build-and-package.md`: PyInstaller를 활용한 `.exe` 빌드 가이드
 
 ### `05-decisions/` (아키텍처 의사결정 기록 - ADR)
 - `ADR-0001-MVC-Pattern.md`: 엄격한 MVC 단방향 아키텍처 채택
 - `ADR-0002-PyQt6-Selection.md`: 프론트엔드 프레임워크로 PyQt6 선정
 - `ADR-0003-IsolationForest.md`: 어뷰징 탐지 알고리즘 선정
 - `ADR-template.md`: (신규 의사결정 시 사용할 템플릿)
-
-### `06-implementation/` (구현 및 배포 가이드)
-- `build-and-package.md`: PyInstaller를 활용한 `.exe` 빌드 가이드
 
 ---
 

@@ -537,7 +537,7 @@
 | **C-3** | 에이전트 설치 금지 | NFR-2.1, ASM-2 |
 | **C-4** | 엄격한 MVC | NFR-3.2, FR-5.1 (차트 위젯 분리·Signal 경유) |
 | **C-5** | Python 스택·Windows | NFR-1.1 (Worker Thread), 전체 구현 환경 |
-| **C-6** | 단일 실행 파일 | NFR-4.1 (아이콘 적용 포함) (빌드·배포 단계 / `06-implementation/build-and-package.md`) |
+| **C-6** | 단일 실행 파일 | NFR-4.1 (아이콘 적용 포함) (빌드·배포 단계 / `04-implementation/build-and-package.md`) |
 | **C-7** | JRE 의존성 배제 | FR-3.3 (순수 Python·C 확장 형태소 분석) |
 | **C-8** | pickle 금지 (JSON만) | NFR-2.3 |
 | **C-9** | Git CLI 의존성 대응 | FR-2.1, FR-2.2 |

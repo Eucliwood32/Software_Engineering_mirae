@@ -19,7 +19,7 @@
 
 ### 1.2 범위
 - **다룬다:** View 파일·모듈 분해와 LOC 예산, 위젯 합성 트리, View↔Controller 경계 계약, 컴포넌트별 공개 API, 차트 3종의 렌더·애니메이션·툴팁·차트간 연동, UI 상태 전이, 스타일 토큰, 테스트 접근자.
-- **다루지 않는다:** Model 내부 알고리즘(→ `model-design.md`), Controller 라우팅·Worker 수명관리·DTO 직렬화 상세(→ `controller-design.md`), 빌드/패키징(→ `06-implementation/`).
+- **다루지 않는다:** Model 내부 알고리즘(→ `model-design.md`), Controller 라우팅·Worker 수명관리·DTO 직렬화 상세(→ `controller-design.md`), 빌드/패키징(→ `04-implementation/`).
 
 ### 1.3 다이어그램 표기 규약
 다이어그램은 **Mermaid**로 작성하며, 미지원 뷰어를 위해 각 다이어그램에 텍스트 fallback 캡션을 병기한다(architecture-overview §1.3 규약 승계). Mermaid는 문서 렌더링 도구일 뿐 `QCE.exe` 런타임과 무관하다(C-6 무영향).
