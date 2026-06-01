@@ -3,7 +3,7 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 문서 버전 | v1.4 |
+| 문서 버전 | v1.5 |
 | 작성일 | 2026-06-01 |
 | 상위 문서 | Architecture Overview v1.3, Requirements Record v1.5, View Design v1.4 |
 | 관련 모듈 | `AppController`, `AnalysisOrchestrator` |
@@ -37,7 +37,12 @@ Controller 레이어는 크게 전역 상태와 라우팅을 담당하는 `AppCo
   - View에서 발생한 사용자 입력(분석 시작, 병합 요청 등)을 캡처하여 적절한 로직 혹은 `AnalysisOrchestrator`로 위임.
   - Worker Thread 작업 완료 시, `AnalysisOrchestrator`로부터 전달받은 `MemberScore` 목록을 `dataclasses.asdict()`로 직렬화 후 `ResultScreen.render(score_dicts, missing)` 호출 (INV-V1).
   - 결과 화면 병합 요청(`merge_requested`) 수신 시 원시 지표 재집계 흐름 조율 (FR-5.7).
-  - `new_analysis_requested` 수신 시 상태 초기화 후 `show_submit()`.
+  - `on_new_analysis_requested()`: 
+    - Tracker 캐시 비우기
+    - **Controller 내부 입력 경로 캐시**(`_doc_paths`, `_git_path`, `_msg_path`) 비우기
+    - **Orchestrator의 이전 분석 데이터**(`reset()`) 비우기
+    - SubmitScreen 파일 목록 UI 비우기
+    - 결과적으로 상태를 프로그램 초기 기동 상태로 완전 리셋한 뒤 `show_submit()` 호출.
 
 - **화면 전환 생명주기 (FR-5.4):**
 
@@ -224,3 +229,4 @@ ResultScreen.merge_requested(mapping={alias → member})
 | **v1.2** | **2026-05-31** | **구 SRS.md 폐지 반영 — 신호 예외 처리·신원 추천 배선 추가. (1) §2.1 인터페이스에 `on_signal_dismissed`·`_render_results` 추가 및 배선 설명(c) — `NormalizedSignalsTracker`(FR-4.2c) 보유, "정상으로 표시"는 재집계 없이 표시만 갱신(점수 불변, STR-7), 새 분석 시 `tracker.clear()`. (2) `_render_results`가 `AliasExtractor.suggest_groups`로 병합 후보를 만들어 `set_suggested_mapping`으로 전달(FR-1.3, 자동병합 아님). (3) 신호 connect 목록에 `ResultScreen.signal_dismissed` 추가. (4) RTM §5에 FR-4.2c 행 추가, FR-1.3 행에 추천 명시. (5) 상위 문서를 Architecture v1.3·RR v1.5·View Design v1.4로 갱신.** | QCE 개발팀 |
 | v1.3 | 2026-06-01 | 사용자 피드백(UX 버그 개선) 반영: (1) §2.1 AppController의 on_new_analysis_requested 시그니처에 [새 분석] 진입 시 파일명/저장소 등 이전 뷰 데이터의 완전 초기화(리셋) 제어 책임 명문화. (2) §4 파이프라인 제어 원칙에 카카오톡 등 단일 소스 입력 시의 파이프라인 정상 구동 보장 명시. | QCE 개발팀 |
 | **v1.4** | **2026-06-01** | **사용자 피드백(슬라이더 비례 분배·표기 개선) 반영: (1) §2.1 화면 전환 조건표에서 가중치 합 표기를 1.0에서 100%로 변경. (2) `_on_weights_changed` 경고 문구를 퍼센트 단위로 변경.** | QCE 개발팀 |
+| **v1.5** | **2026-06-01** | **버그 수정(새 분석 시 이전 데이터 잔존) 반영: §2.1 `on_new_analysis_requested` 시그니처에 Controller 내부 입력 캐시(`_doc_paths` 등) 및 Orchestrator 데이터 초기화 책임 명시.** | QCE 개발팀 |

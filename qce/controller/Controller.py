@@ -228,6 +228,15 @@ class AnalysisOrchestrator(QObject):
         self._raw_msg_details = None
         self._current_weights = None
 
+    def reset(self) -> None:
+        """이전 분석 결과 데이터를 초기화한다."""
+        self._raw_git = None
+        self._raw_docs = None
+        self._raw_msgs = None
+        self._raw_doc_details = None
+        self._raw_msg_details = None
+        self._current_weights = None
+
     def start_analysis(self, config: dict) -> None:
         if self.is_analyzing:
             return
@@ -327,6 +336,13 @@ class AppController:
         if self.tracker:
             self.tracker.clear()
         self._last_scores = []
+        
+        # Controller 내부 캐시 및 Orchestrator 상태 초기화 (버그 수정)
+        self._doc_paths = []
+        self._git_path = ""
+        self._msg_path = ""
+        self.orchestrator.reset()
+        
         self.main_window.submit.reset()
         self.main_window.show_submit()
 

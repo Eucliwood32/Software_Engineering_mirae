@@ -56,7 +56,7 @@ def test_weights_invalid_disables_and_warns(ctx):
     ctrl, mw, _, _ = ctx
     mw.submit.analysis_panel.weights_changed.emit({"w_git": 0.5, "w_doc": 0.5, "w_msg": 0.5})
     assert mw.submit.analysis_panel.analyze_enabled() is False
-    assert "1.00" in mw.submit.analysis_panel.weight_warning_text()
+    assert "100%" in mw.submit.analysis_panel.weight_warning_text()
 
 
 def test_preset_apply_drives_weights_and_validation(ctx):
@@ -106,10 +106,23 @@ def test_merge_requested_delegates(ctx):
     assert mw.current_screen() is mw.loading
 
 
-def test_new_analysis_returns_to_submit(ctx):
-    ctrl, mw, _, _ = ctx
-    mw.show_result()
+def test_new_analysis_requested_resets_state(ctx):
+    ctrl, mw, orchestrator, _ = ctx
+    # 가짜 캐시 주입
+    ctrl._doc_paths = ["fake.docx"]
+    ctrl._git_path = "fake_git"
+    ctrl._msg_path = "fake.txt"
+    orchestrator._raw_git = {"user": 1}
+    
     mw.result.new_analysis_requested.emit()
+    
+    # 내부 상태가 리셋되었는지 확인
+    assert ctrl._doc_paths == []
+    assert ctrl._git_path == ""
+    assert ctrl._msg_path == ""
+    assert orchestrator._raw_git is None
+    
+    # 화면 전환
     assert mw.current_screen() is mw.submit
 
 
