@@ -10,8 +10,10 @@ INV-V1/V2: model/controller/common import 금지. Signal은 발행만 하고 con
 """
 from __future__ import annotations
 
+import os
+
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import QMainWindow, QStackedWidget, QToolButton
+from PyQt6.QtWidgets import QLabel, QMainWindow, QStackedWidget, QToolButton
 
 from qce.view.dialogs.settings_dialog import SettingsDialog
 from qce.view.panels.loading_screen import LoadingScreen
@@ -21,7 +23,10 @@ from qce.view.style.qss import app_stylesheet
 from qce.view.style.theme import theme_manager
 
 
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QIcon, QPixmap
+
+_LOGO_PATH = os.path.join(os.path.dirname(__file__), "assets", "logo.png")
+
 
 class MainWindow(QMainWindow):
     save_report_requested = pyqtSignal()
@@ -47,6 +52,18 @@ class MainWindow(QMainWindow):
         self.show_submit()
 
     def _build_menu(self) -> None:
+        # 모든 화면에서 항상 노출되는 좌측 상단 작은 로고 (셸 크롬, 요구사항 1)
+        self.corner_logo = QLabel()
+        pix = QPixmap(_LOGO_PATH)
+        if not pix.isNull():
+            self.corner_logo.setPixmap(
+                pix.scaledToHeight(20, Qt.TransformationMode.SmoothTransformation)
+            )
+        else:
+            self.corner_logo.setText("QCE")
+            self.corner_logo.setObjectName("cornerLogo")
+        self.menuBar().setCornerWidget(self.corner_logo, Qt.Corner.TopLeftCorner)
+
         menu = self.menuBar().addMenu("파일")
         self._act_save = menu.addAction("리포트 저장…")
         self._act_save.triggered.connect(self.save_report_requested.emit)

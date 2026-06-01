@@ -1,17 +1,26 @@
 """
 ResultScreen — 결과 화면 (view-design §6.11, FR-5.7).
 
-DashboardView(3차트+신호)와 WarningBanner, 계정 병합 컨트롤(AliasMappingDialog
-재사용)과 [새 분석] 버튼을 배치한다. 병합 컨트롤에서 복수 인물을 1인으로 합치면
-merge_requested(분석-후 N:1)를 올리고, Controller가 재집계·재정규화 후 render로
-갱신한다(결정: 재집계+재정규화). View는 merge_requested만 발행한다(INV-V1).
+세로 스크롤 페이지로 결과를 한 항목씩 읽어 내려가도록 구성한다(웹 문서 느낌, 넉넉한
+좌우 패딩). 순서: 페이지 타이틀("프로젝트 분석 결과") → 결측 배너 → 막대 → 산점도 →
+레이더 → 이상 신호 → 인원 합치기(AliasMappingDialog 재사용) → 하단 [새 분석]·[리포트 저장].
+각 그래프에는 의미를 알려주는 섹션 타이틀이 붙는다(타이틀·간격은 DashboardView가 부여).
+
+병합 컨트롤에서 복수 인물을 1인으로 합치면 merge_requested(분석-후 N:1)를 올리고,
+Controller가 재집계·재정규화 후 render로 갱신한다. [리포트 저장]은 save_report_requested를
+발행만 하며 실제 저장은 Controller(ReportExporter)가 수행한다(INV-V1).
 """
 from __future__ import annotations
 
-import os
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QPixmap
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
 
 from qce.view.contract import (
     K_AUTHOR,
@@ -22,13 +31,14 @@ from qce.view.contract import (
 from qce.view.dialogs.alias_mapping_dialog import AliasMappingDialog
 from qce.view.panels.dashboard_view import DashboardView
 from qce.view.panels.warning_banner import WarningBanner
+from qce.view.style import tokens as T
 
-_LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "logo.png")
 
 class ResultScreen(QWidget):
     merge_requested = pyqtSignal(dict)            # {alias→member} 병합 그룹
     new_analysis_requested = pyqtSignal()
     signal_dismissed = pyqtSignal(str, str, str)  # (author, type, ref) — FR-4.2c 중계
+    save_report_requested = pyqtSignal()          # [리포트 저장] — Controller가 저장 수행
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -40,31 +50,60 @@ class ResultScreen(QWidget):
         # 신호 예외 처리(FR-4.2c) → Controller로 중계
         self.dashboard.signal_dismissed.connect(self.signal_dismissed)
 
-        root = QVBoxLayout(self)
+        # ── 세로 스크롤 페이지 (요구사항 3: 넉넉한 패딩 + 스크롤로 천천히 읽기) ──
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
 
-        # 로고 (가운데 상단, 여백 포함 작게 표시)
-        logo = QLabel()
-        logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        logo.setContentsMargins(20, 20, 20, 20)
-        pix = QPixmap(_LOGO_PATH)
-        if not pix.isNull():
-            logo.setPixmap(pix.scaledToHeight(48, Qt.TransformationMode.SmoothTransformation))
-        else:
-            logo.setText("QCE")
-            logo.setObjectName("logoText")
-            logo.setStyleSheet("font-size: 22pt; font-weight: bold;")
-        root.addWidget(logo)
+        scroll = QScrollArea()
+        scroll.setObjectName("resultScroll")
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
-        root.addWidget(self.banner)
-        root.addWidget(self.dashboard, stretch=1)
-        root.addWidget(self.merge)
+        page = QWidget()
+        page_lyt = QVBoxLayout(page)
+        # 웹사이트 느낌의 넉넉한 좌우 패딩 + 섹션 간 넓은 간격
+        page_lyt.setContentsMargins(
+            T.SPACING_SECTION, T.SPACING_XL, T.SPACING_SECTION, T.SPACING_XL
+        )
+        page_lyt.setSpacing(T.SPACING_SECTION)
+        page_lyt.setAlignment(Qt.AlignmentFlag.AlignTop)
 
+        # 페이지 타이틀
+        title = QLabel("프로젝트 분석 결과")
+        title.setObjectName("pageTitle")
+        page_lyt.addWidget(title)
+
+        page_lyt.addWidget(self.banner)
+        # 막대 → 산점도 → 레이더 → 이상 신호 (각 섹션 타이틀은 DashboardView가 부여)
+        page_lyt.addWidget(self.dashboard)
+
+        # 인원 합치기 섹션
+        merge_title = QLabel("인원 합치기")
+        merge_title.setObjectName("sectionTitle")
+        page_lyt.addWidget(merge_title)
+        merge_hint = QLabel("여러 계정으로 잡힌 한 사람을 골라 하나로 합치면 결과가 다시 집계됩니다.")
+        merge_hint.setObjectName("sectionHint")
+        merge_hint.setWordWrap(True)
+        page_lyt.addWidget(merge_hint)
+        page_lyt.addWidget(self.merge)
+
+        # 하단 액션: [새 분석] · [리포트 저장] 나란히 (요구사항 3-2)
         bottom = QHBoxLayout()
+        bottom.setSpacing(T.SPACING_SM)
         bottom.addStretch(1)
         self._new_btn = QPushButton("새 분석")
+        self._new_btn.setObjectName("secondary")
         self._new_btn.clicked.connect(self.new_analysis_requested.emit)
         bottom.addWidget(self._new_btn)
-        root.addLayout(bottom)
+        self._save_btn = QPushButton("리포트 저장")
+        self._save_btn.setObjectName("primary")
+        self._save_btn.clicked.connect(self.save_report_requested.emit)
+        bottom.addWidget(self._save_btn)
+        page_lyt.addLayout(bottom)
+
+        scroll.setWidget(page)
+        outer.addWidget(scroll)
 
     def render(self, scores: list[dict], missing: set[str]) -> None:
         """대시보드·배너 갱신 + 병합 후보 목록 채움."""

@@ -313,8 +313,10 @@ class AppController:
         result.new_analysis_requested.connect(self.on_new_analysis_requested)
         result.signal_dismissed.connect(self.on_signal_dismissed)
 
-        # 리포트 저장
+        # 리포트 저장 — 메뉴(파일>리포트 저장)와 결과 화면 [리포트 저장] 버튼 양쪽에서 동일 흐름
         main_window.save_report_requested.connect(self._on_save_report_requested)
+        if hasattr(result, "save_report_requested"):
+            result.save_report_requested.connect(self._on_save_report_requested)
 
     def route_event(self, event: str, payload: Any = None) -> None:
         if event == "start_analysis":

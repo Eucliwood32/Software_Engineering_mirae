@@ -16,6 +16,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
+from qce.view.style import tokens as T
+
 
 class GitMissingDialog(QDialog):
     DOWNLOAD_URL = "https://git-scm.com/download/win"
@@ -26,11 +28,19 @@ class GitMissingDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Git을 찾을 수 없습니다")
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(T.SPACING_LG, T.SPACING_LG, T.SPACING_LG, T.SPACING_LG)
+        layout.setSpacing(T.SPACING_MD)
 
-        layout.addWidget(QLabel(self.MESSAGE))
-        layout.addWidget(QLabel(self.PATH_HINT))
+        msg = QLabel(self.MESSAGE)
+        msg.setWordWrap(True)
+        layout.addWidget(msg)
+        hint = QLabel(self.PATH_HINT)
+        hint.setObjectName("placeholder")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
 
         self.download_button = QPushButton("Git 다운로드 페이지 열기")
+        self.download_button.setObjectName("secondary")
         self.download_button.clicked.connect(self._open_download)
         layout.addWidget(self.download_button)
 

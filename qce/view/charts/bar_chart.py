@@ -41,7 +41,7 @@ class BarChartWidget(BaseChartWidget):
 
         # 1위 강조색 + 나머지 기본색
         top_idx = max(xs, key=lambda i: totals[i]) if totals else -1
-        colors = [T.COLOR_PRIMARY if i == top_idx else T.COLOR_BAR_DEFAULT for i in xs]
+        colors = [T.COLOR_BAR_TOP if i == top_idx else T.COLOR_BAR_DEFAULT for i in xs]
 
         self._bars = self.ax.bar(xs, [0.0] * len(authors), color=colors, zorder=3)
         self._totals: dict[str, float] = dict(zip(authors, totals))

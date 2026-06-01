@@ -78,11 +78,11 @@ class ScatterChartWidget(BaseChartWidget):
                 self._available_keys.append(k)
 
         if len(self._available_keys) < 2:
-            self.ax.set_facecolor(T.COLOR_SURFACE)
+            self.ax.set_facecolor(T.COLOR_CANVAS)
             self.ax.set_axis_off()
             self.ax.text(
                 0.5, 0.5, "자료가 한 종류인 경우 산점도가 계산되지 않습니다.",
-                ha="center", va="center", color=T.COLOR_MUTED,
+                ha="center", va="center", color=T.COLOR_TEXT_MUTED,
                 transform=self.ax.transAxes,
             )
             self._label_positions = []

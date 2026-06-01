@@ -21,6 +21,7 @@ from PyQt6.QtWidgets import (
 )
 
 from qce.view.contract import K_ACTIVITY, K_RAW_ID, K_SOURCE
+from qce.view.style import tokens as T
 
 PLACEHOLDER = "(미지정)"
 _SOURCE_LABELS = {"git": "Git", "doc": "문서", "messenger": "메신저"}
@@ -37,8 +38,12 @@ class AliasMappingDialog(QDialog):
         self._row_labels: dict[str, QLabel] = {}
 
         root = QVBoxLayout(self)
+        root.setContentsMargins(T.SPACING_LG, T.SPACING_LG, T.SPACING_LG, T.SPACING_LG)
+        root.setSpacing(T.SPACING_MD)
         self._rows_host = QWidget()
         self._grid = QGridLayout(self._rows_host)
+        self._grid.setHorizontalSpacing(T.SPACING_MD)
+        self._grid.setVerticalSpacing(T.SPACING_XS)
         root.addWidget(self._rows_host)
 
         buttons = QDialogButtonBox(
@@ -120,8 +125,8 @@ class AliasMappingDialog(QDialog):
         if label is None:
             return
         unmapped = self._combos[raw_id].currentText() == PLACEHOLDER
-        # 미매핑 행은 경고색 강조
-        label.setStyleSheet("color: #d93025;" if unmapped else "")
+        # 미매핑 행은 경고색(이상색) 강조 — 활성 팔레트의 COLOR_ANOMALY
+        label.setStyleSheet(f"color: {T.COLOR_ANOMALY};" if unmapped else "")
 
     # --- 테스트 접근자 ---
     def row_count(self) -> int:

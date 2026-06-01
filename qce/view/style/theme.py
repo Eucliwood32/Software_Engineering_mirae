@@ -74,61 +74,42 @@ class ThemeManager(QObject):
         """tokens 팔레트 + 앱 QPalette 적용 후 changed 발행(view-design §10.2)."""
         dark = self.is_dark()
         T.apply_palette(dark)
-        self._apply_app_palette(dark)
+        self._apply_app_palette()
         self._hook_system_changes()
         self.changed.emit()
 
-    def _apply_app_palette(self, dark: bool) -> None:
-        """Fusion 스타일 네이티브 위젯(메뉴·다이얼로그 등)을 위한 QPalette 설정."""
+    def _apply_app_palette(self) -> None:
+        """Fusion 스타일 네이티브 위젯(메뉴·다이얼로그 등)을 위한 QPalette 설정.
+
+        색은 활성 토큰 팔레트(apply()가 _apply_app_palette 직전 apply_palette를 호출)에서
+        읽어 단일 출처를 유지한다. 라이트는 빈 팔레트를 두면 시스템(다크)이 채워
+        배경이 미전환되므로 명시 적용한다.
+        """
         app = QApplication.instance()
         if app is None:
             return
         pal = QPalette()
-        if dark:
-            bg = QColor("#1e1e1e")
-            base = QColor("#2b2b2b")
-            text = QColor("#e8eaed")
-            disabled = QColor("#6e6e6e")
-            pal.setColor(QPalette.ColorRole.Window, bg)
-            pal.setColor(QPalette.ColorRole.WindowText, text)
-            pal.setColor(QPalette.ColorRole.Base, base)
-            pal.setColor(QPalette.ColorRole.AlternateBase, bg)
-            pal.setColor(QPalette.ColorRole.Text, text)
-            pal.setColor(QPalette.ColorRole.Button, base)
-            pal.setColor(QPalette.ColorRole.ButtonText, text)
-            pal.setColor(QPalette.ColorRole.ToolTipBase, base)
-            pal.setColor(QPalette.ColorRole.ToolTipText, text)
-            pal.setColor(QPalette.ColorRole.Highlight, QColor("#8ab4f8"))
-            pal.setColor(QPalette.ColorRole.HighlightedText, QColor("#202124"))
-            pal.setColor(
-                QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text, disabled
-            )
-            pal.setColor(
-                QPalette.ColorGroup.Disabled, QPalette.ColorRole.ButtonText, disabled
-            )
-        else:
-            # 라이트: 빈 팔레트를 두면 시스템(다크)이 채워 배경 미전환 → 명시 적용
-            bg = QColor("#ffffff")
-            base = QColor("#ffffff")
-            text = QColor("#202124")
-            disabled = QColor("#9aa0a6")
-            pal.setColor(QPalette.ColorRole.Window, bg)
-            pal.setColor(QPalette.ColorRole.WindowText, text)
-            pal.setColor(QPalette.ColorRole.Base, base)
-            pal.setColor(QPalette.ColorRole.AlternateBase, QColor("#f8f9fa"))
-            pal.setColor(QPalette.ColorRole.Text, text)
-            pal.setColor(QPalette.ColorRole.Button, QColor("#f1f3f4"))
-            pal.setColor(QPalette.ColorRole.ButtonText, text)
-            pal.setColor(QPalette.ColorRole.ToolTipBase, base)
-            pal.setColor(QPalette.ColorRole.ToolTipText, text)
-            pal.setColor(QPalette.ColorRole.Highlight, QColor("#4285f4"))
-            pal.setColor(QPalette.ColorRole.HighlightedText, QColor("#ffffff"))
-            pal.setColor(
-                QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text, disabled
-            )
-            pal.setColor(
-                QPalette.ColorGroup.Disabled, QPalette.ColorRole.ButtonText, disabled
-            )
+        canvas = QColor(T.COLOR_CANVAS)
+        surface = QColor(T.COLOR_SURFACE)
+        surface2 = QColor(T.COLOR_SURFACE_2)
+        text = QColor(T.COLOR_TEXT)
+        disabled = QColor(T.COLOR_TEXT_DISABLED)
+        primary = QColor(T.COLOR_PRIMARY)
+        on_primary = QColor("#ffffff")
+
+        pal.setColor(QPalette.ColorRole.Window, canvas)
+        pal.setColor(QPalette.ColorRole.WindowText, text)
+        pal.setColor(QPalette.ColorRole.Base, canvas)
+        pal.setColor(QPalette.ColorRole.AlternateBase, surface)
+        pal.setColor(QPalette.ColorRole.Text, text)
+        pal.setColor(QPalette.ColorRole.Button, surface2)
+        pal.setColor(QPalette.ColorRole.ButtonText, text)
+        pal.setColor(QPalette.ColorRole.ToolTipBase, surface)
+        pal.setColor(QPalette.ColorRole.ToolTipText, text)
+        pal.setColor(QPalette.ColorRole.Highlight, primary)
+        pal.setColor(QPalette.ColorRole.HighlightedText, on_primary)
+        pal.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text, disabled)
+        pal.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.ButtonText, disabled)
         app.setPalette(pal)
 
     def _hook_system_changes(self) -> None:

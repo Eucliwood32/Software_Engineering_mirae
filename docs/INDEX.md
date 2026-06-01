@@ -17,6 +17,7 @@
 - `model-parser-design.md`: 데이터 파서 설계
 - `model-business-logic-design.md`: 정규화·Capping·이상 신호·집계·캐시·리포트 등 BusinessLogic 레이어 상세 설계
 - `view-design.md`: PyQt6 UI 계층 및 캔버스 시각화 설계
+- `qce-design-guide.md`: 디자인 가이드 (Product-First Minimalism — 색·타이포·간격·반경·그림자 토큰, 라이트/다크, 컴포넌트 QSS 명세). View 표현 속성의 단일 출처
 - `controller-design.md`: 모델-뷰 중재 로직 설계
 
 ### `03-verification-validation/` (테스트 및 검증)

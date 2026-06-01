@@ -24,12 +24,15 @@ from PyQt6.QtWidgets import (
 )
 
 from qce.view.contract import K_AUTHOR, K_SIGNAL_DETAILS
+from qce.view.style import tokens as T
 
-# 신호 유형 → (섹션 제목, 색상). 표시 순서도 이 dict 순서를 따른다.
-_TYPE_META: dict[str, tuple[str, str]] = {
-    "CAPPING": ("대량 변경 (Capping 적용)", "#d98324"),
-    "EW-02": ("커밋 빈도 급증 (EW-02)", "#c0392b"),
-    "ZSCORE": ("기여 지표 하위 이상치 (Z-Score)", "#8e44ad"),
+# 신호 유형 → 섹션 제목. 표시 순서도 이 dict 순서를 따른다.
+# (색상은 qce-design-guide §6 signal_card 명세에 따라 COLOR_ANOMALY 단일색으로 통일 —
+#  카드 좌측 보더·섹션 헤더 모두 QSS objectName(signalCard·signalSection)이 채색한다.)
+_TYPE_META: dict[str, str] = {
+    "CAPPING": "대량 변경 (Capping 적용)",
+    "EW-02": "커밋 빈도 급증 (EW-02)",
+    "ZSCORE": "기여 지표 하위 이상치 (Z-Score)",
 }
 _TYPE_ORDER = list(_TYPE_META.keys())
 _DISMISS_LABEL = "정상으로 표시"
@@ -71,19 +74,17 @@ class _SignalCard(QFrame):
 
     dismissed = pyqtSignal(str, str, str)        # (author, type, ref)
 
-    def __init__(self, author: str, detail: dict, accent: str, parent=None) -> None:
+    def __init__(self, author: str, detail: dict, parent=None) -> None:
         super().__init__(parent)
-        self.setObjectName("signalCard")
+        self.setObjectName("signalCard")        # QSS: COLOR_ANOMALY 좌측 보더·surface 배경
         self._author = author
         self._type = detail.get("type", "")
         self._ref = _ref_of(detail)
-        self.setStyleSheet(
-            f"#signalCard {{ border-left: 4px solid {accent};"
-            f" background: rgba(0,0,0,0.03); border-radius: 4px; }}"
-        )
 
         row = QHBoxLayout(self)
-        row.setContentsMargins(8, 6, 8, 6)
+        # qce-design-guide §6 signal_card padding: SPACING_SM / SPACING_MD
+        row.setContentsMargins(T.SPACING_MD, T.SPACING_SM, T.SPACING_MD, T.SPACING_SM)
+        row.setSpacing(T.SPACING_SM)
 
         label = QLabel(_describe(author, detail))
         label.setWordWrap(True)
@@ -112,6 +113,7 @@ class AnomalySignalPanel(QWidget):
         super().__init__(parent)
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(T.SPACING_SM)
 
         self._title = QLabel("이상 신호")
         self._title.setObjectName("signalPanelTitle")
@@ -150,12 +152,12 @@ class AnomalySignalPanel(QWidget):
             items = grouped.get(t, [])
             if not items:
                 continue
-            section_title, accent = _TYPE_META[t]
+            section_title = _TYPE_META[t]
             header = QLabel(f"● {section_title}  ({len(items)})")
-            header.setStyleSheet(f"color: {accent}; font-weight: 600;")
+            header.setObjectName("signalSection")     # QSS: COLOR_ANOMALY·weight 600
             self._host_layout.insertWidget(self._host_layout.count() - 1, header)
             for author, detail in items:
-                card = _SignalCard(author, detail, accent)
+                card = _SignalCard(author, detail)
                 card.dismissed.connect(self.signal_dismissed)
                 self._host_layout.insertWidget(self._host_layout.count() - 1, card)
                 self._cards.append(card)

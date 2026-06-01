@@ -22,18 +22,19 @@ def _reset_theme():
 
 
 def test_apply_palette_switches_tokens():
+    # qce-design-guide §2 팔레트(Product-First Minimalism) 값으로 갱신.
     T.apply_palette(True)
-    assert T.COLOR_BG == "#1e1e1e"
-    assert T.COLOR_TEXT == "#e8eaed"
+    assert T.COLOR_BG == "#1c1c1e"          # = COLOR_CANVAS(dark)
+    assert T.COLOR_TEXT == "#f5f5f7"
     T.apply_palette(False)
-    assert T.COLOR_BG == "#ffffff"
-    assert T.COLOR_TEXT == "#202124"
+    assert T.COLOR_BG == "#ffffff"          # = COLOR_CANVAS(light)
+    assert T.COLOR_TEXT == "#1d1d1f"
 
 
 def test_theme_manager_set_dark_toggles_palette(qtbot):
     theme_manager.set_dark(True)
     assert theme_manager.is_dark() is True
-    assert T.COLOR_BG == "#1e1e1e"
+    assert T.COLOR_BG == "#1c1c1e"
     theme_manager.set_dark(False)
     assert theme_manager.is_dark() is False
     assert T.COLOR_BG == "#ffffff"
@@ -50,7 +51,7 @@ def test_dark_switch_delegates_to_theme_manager(qtbot):
     qtbot.addWidget(d)
     d._dark_switch.setChecked(True)          # 스위치 조작 → theme_manager.set_dark(True)
     assert theme_manager.is_dark() is True
-    assert T.COLOR_BG == "#1e1e1e"
+    assert T.COLOR_BG == "#1c1c1e"
     d._dark_switch.setChecked(False)
     assert theme_manager.is_dark() is False
 

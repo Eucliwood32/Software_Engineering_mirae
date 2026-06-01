@@ -15,20 +15,23 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
+    QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
     QSlider,
     QVBoxLayout,
-    QWidget,
 )
+
+from qce.view.style import tokens as T
+from qce.view.style.effects import apply_card_shadow
 
 _STEP = 0.05
 _TICKS = 20  # 0.00~1.00을 0.05 단위 → 21 포지션(0..20)
 
 
-class AnalysisPanel(QWidget):
+class AnalysisPanel(QFrame):
     weights_changed = pyqtSignal(dict)
     preset_chosen = pyqtSignal(str)
     analyze_clicked = pyqtSignal()
@@ -41,14 +44,24 @@ class AnalysisPanel(QWidget):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
+        # COLOR_SURFACE 카드로 감싸 드롭존과 구분(qce-design-guide §8). 그림자는 카드 전용.
+        self.setObjectName("card")
+        apply_card_shadow(self)
         root = QVBoxLayout(self)
+        root.setContentsMargins(
+            T.CARD_PADDING, T.CARD_PADDING, T.CARD_PADDING, T.CARD_PADDING
+        )
+        root.setSpacing(T.SPACING_MD)
 
-        # 프리셋 버튼
+        # 프리셋 버튼 — 선택 가능한 칩(pill)
         preset_row = QHBoxLayout()
+        preset_row.setSpacing(T.SPACING_XS)
         for name in self.PRESETS:
             btn = QPushButton(name)
+            btn.setObjectName("preset")
             btn.clicked.connect(lambda _checked=False, n=name: self.apply_preset(n))
             preset_row.addWidget(btn)
+        preset_row.addStretch(1)
         root.addLayout(preset_row)
 
         # 슬라이더 3개 (git/doc/msg) — 라벨 폭 차이로 시작점이 어긋나지 않도록
@@ -57,12 +70,15 @@ class AnalysisPanel(QWidget):
         self._value_labels: dict[str, QLabel] = {}
         slider_grid = QGridLayout()
         slider_grid.setColumnStretch(1, 1)  # 슬라이더 컬럼만 늘어남
+        slider_grid.setHorizontalSpacing(T.SPACING_MD)
+        slider_grid.setVerticalSpacing(T.SPACING_SM)
         for row_idx, (key, label) in enumerate(
             (("w_git", "Git"), ("w_doc", "문서"), ("w_msg", "메신저"))
         ):
             lbl = QLabel(label)
             lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             s = QSlider(Qt.Orientation.Horizontal)
+            s.setObjectName("weight")
             s.setRange(0, _TICKS)
             s.setSingleStep(1)
             s.setPageStep(1)
@@ -82,6 +98,7 @@ class AnalysisPanel(QWidget):
         root.addLayout(slider_grid)
 
         self._sum_label = QLabel("")
+        self._sum_label.setObjectName("placeholder")
         root.addWidget(self._sum_label)
 
         self._warning_label = QLabel("")
@@ -89,10 +106,15 @@ class AnalysisPanel(QWidget):
         self._warning_label.setVisible(False)
         root.addWidget(self._warning_label)
 
+        # [분석 시작]: 가운데 정렬, pill, COLOR_PRIMARY — 화면의 유일한 강조 버튼
         self._analyze_btn = QPushButton("분석 시작")
         self._analyze_btn.setObjectName("primary")
         self._analyze_btn.clicked.connect(self.analyze_clicked.emit)
-        root.addWidget(self._analyze_btn)
+        btn_row = QHBoxLayout()
+        btn_row.addStretch(1)
+        btn_row.addWidget(self._analyze_btn)
+        btn_row.addStretch(1)
+        root.addLayout(btn_row)
 
         self._refresh_sum_label()
 

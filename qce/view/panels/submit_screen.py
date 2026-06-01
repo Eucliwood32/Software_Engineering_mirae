@@ -25,6 +25,7 @@ from PyQt6.QtWidgets import (
 )
 
 from qce.view.panels.analysis_panel import AnalysisPanel
+from qce.view.style import tokens as T
 
 DOC_EXTS = {".pptx", ".docx", ".hwpx"}
 MSG_EXTS = {".txt"}
@@ -55,49 +56,54 @@ class SubmitScreen(QWidget):
         self._git_paths: list[str] = []
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(24, 24, 24, 24)
+        root.setContentsMargins(
+            T.SPACING_XL, T.SPACING_SECTION, T.SPACING_XL, T.SPACING_XL
+        )
+        root.setSpacing(T.SPACING_XL)
 
-        # 로고 (assets/logo.png, 없으면 텍스트 폴백)
+        # 로고 (assets/logo.png, 없으면 텍스트 폴백) — 캔버스 위 헤드라인
         logo = QLabel()
         logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        logo.setContentsMargins(20, 20, 20, 20)
         pix = QPixmap(_LOGO_PATH)
         if not pix.isNull():
             logo.setPixmap(pix.scaledToHeight(48, Qt.TransformationMode.SmoothTransformation))
         else:
             logo.setText("QCE — 부탁해 꼬마선장")
             logo.setObjectName("logoText")
-            logo.setStyleSheet("font-size: 22pt; font-weight: bold;")
         root.addWidget(logo)
 
         desc = QLabel(_DESCRIPTION)
+        desc.setObjectName("placeholder")
         desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
         desc.setWordWrap(True)
         root.addWidget(desc)
 
-        # 드롭존: 빈 상태는 안내 문구, 1개 이상 적재 시 아이콘+파일명+삭제 버튼 목록 (§6.9 v1.7)
+        # 드롭존: 빈 상태는 안내 문구, 1개 이상 적재 시 아이콘+파일명+삭제 버튼 목록 (§6.9 v1.7).
+        # 점선 컨테이너 스타일은 QSS #dropzone가 담당(라이트/다크·드래그 강조 일원화).
         self._dropzone_scroll = QScrollArea()
         self._dropzone_scroll.setWidgetResizable(True)
-        self._dropzone_scroll.setObjectName("dropzone_scroll")
-        self._dropzone_scroll.setStyleSheet(
-            "QScrollArea#dropzone_scroll { border: 2px dashed #9aa0a6; border-radius: 8px; background: transparent; }"
-        )
-        self._dropzone_scroll.setMinimumHeight(140)
+        self._dropzone_scroll.setObjectName("dropzone")
+        self._dropzone_scroll.setMinimumHeight(T.DROPZONE_MIN_H)
 
         self._dropzone_container = QWidget()
-        self._dropzone_container.setStyleSheet("background: transparent;")
         self._dropzone_layout = QVBoxLayout(self._dropzone_container)
         self._dropzone_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        self._dropzone_layout.setContentsMargins(16, 12, 16, 12)
-        
+        self._dropzone_layout.setContentsMargins(
+            T.SPACING_LG, T.SPACING_MD, T.SPACING_LG, T.SPACING_MD
+        )
+        self._dropzone_layout.setSpacing(T.SPACING_XS)
+
         self._dropzone_scroll.setWidget(self._dropzone_container)
         root.addWidget(self._dropzone_scroll, stretch=1)
 
         # 적재 피드백 + Git 선택
         row = QHBoxLayout()
+        row.setSpacing(T.SPACING_SM)
         self._loaded_label = QLabel("")
+        self._loaded_label.setObjectName("placeholder")
         row.addWidget(self._loaded_label, stretch=1)
         self._git_btn = QPushButton("Git 저장소 선택…")
+        self._git_btn.setObjectName("secondary")
         self._git_btn.clicked.connect(self.choose_git_repo)
         row.addWidget(self._git_btn)
         root.addLayout(row)
@@ -105,7 +111,7 @@ class SubmitScreen(QWidget):
         # 가중치 패널 (FR-4.4) — analyze_clicked는 이 패널이 발행
         self.analysis_panel = AnalysisPanel()
         root.addWidget(self.analysis_panel)
-        
+
         self._refresh_dropzone()
 
     # ------------------------------------------------------------------ #
@@ -113,14 +119,27 @@ class SubmitScreen(QWidget):
     # ------------------------------------------------------------------ #
     def dragEnterEvent(self, e) -> None:
         if e.mimeData().hasUrls():
+            self._set_drag_active(True)        # 드래그 진입 시 드롭존 테두리 강조(시각 전용)
             e.acceptProposedAction()
         else:
             e.ignore()
 
+    def dragLeaveEvent(self, e) -> None:
+        self._set_drag_active(False)
+        super().dragLeaveEvent(e)
+
     def dropEvent(self, e) -> None:
+        self._set_drag_active(False)
         paths = [u.toLocalFile() for u in e.mimeData().urls() if u.isLocalFile()]
         self._handle_dropped_paths(paths)
         e.acceptProposedAction()
+
+    def _set_drag_active(self, active: bool) -> None:
+        """드롭존 테두리 강조 토글(QSS #dropzone[drag_active]). 동작·신호 무영향."""
+        self._dropzone_scroll.setProperty("drag_active", "true" if active else "false")
+        style = self._dropzone_scroll.style()
+        style.unpolish(self._dropzone_scroll)
+        style.polish(self._dropzone_scroll)
 
     def _handle_dropped_paths(self, paths: list[str]) -> None:
         """드롭 경로 처리: 폴더는 내부 파일로 펼치고, `.git`을 가진 폴더는 Git 저장소로
@@ -217,8 +236,8 @@ class SubmitScreen(QWidget):
 
         if not self._doc_paths and not self._msg_paths and not self._git_paths:
             hint = QLabel(_DROP_HINT)
+            hint.setObjectName("placeholder")
             hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            hint.setStyleSheet("color: #80868b;")
             hint.setTextFormat(Qt.TextFormat.RichText)
             hint.setWordWrap(True)
             self._dropzone_layout.addWidget(hint)
@@ -233,20 +252,25 @@ class SubmitScreen(QWidget):
 
     def _add_item_widget(self, icon: str, path: str, item_type: str) -> None:
         row = QWidget()
-        row.setStyleSheet("background: transparent;")
         lyt = QHBoxLayout(row)
-        lyt.setContentsMargins(0, 2, 0, 2)
-        
+        lyt.setContentsMargins(0, T.SPACING_XXS, 0, T.SPACING_XXS)
+        lyt.setSpacing(T.SPACING_XS)
+
         lbl = QLabel(f"{icon} {html.escape(os.path.basename(path))}" + (" (Git 저장소)" if item_type == "git" else ""))
-        lbl.setStyleSheet("font-size: 11pt;")
+        lbl.setStyleSheet(f"font-size: {T.FONT_BODY}px;")
         lyt.addWidget(lbl, stretch=1)
-        
+
+        # [X] 삭제 — 유틸 액션. 호버 시 이상색(remove) 강조. 시각 전용.
         btn = QPushButton("✕")
         btn.setFixedSize(24, 24)
-        btn.setStyleSheet("QPushButton { border: none; font-weight: bold; color: #d93025; font-size: 11pt; } QPushButton:hover { background: #fce8e6; border-radius: 12px; }")
+        btn.setStyleSheet(
+            "QPushButton { border: none; background: transparent; font-weight: 600;"
+            f" color: {T.COLOR_TEXT_MUTED}; font-size: {T.FONT_CAPTION}px; }}"
+            f" QPushButton:hover {{ color: {T.COLOR_ANOMALY}; }}"
+        )
         btn.clicked.connect(lambda _, t=item_type, p=path: self._remove_item(t, p))
         lyt.addWidget(btn)
-        
+
         self._dropzone_layout.addWidget(row)
 
     def _remove_item(self, item_type: str, path: str) -> None:

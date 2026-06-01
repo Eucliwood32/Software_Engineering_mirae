@@ -20,8 +20,8 @@ from PyQt6.QtWidgets import QVBoxLayout, QWidget
 from qce.view.style import tokens as T
 from qce.view.style.theme import theme_manager
 
-# 한글 폰트·음수 부호 깨짐 방지 (view-design §10, C-5)
-matplotlib.rcParams["font.family"] = T.FONT_FAMILY
+# 한글 폰트·음수 부호 깨짐 방지 (view-design §10, qce-design-guide §7, C-5)
+matplotlib.rcParams["font.family"] = T.FONT_FAMILY_CHART
 matplotlib.rcParams["axes.unicode_minus"] = False
 
 PLACEHOLDER_TEXT = "분석을 실행하면 결과가 표시됩니다."
@@ -74,11 +74,11 @@ class BaseChartWidget(QWidget):
         """축 숨기고 중앙에 안내 문구."""
         self._apply_canvas_theme()
         self.ax.clear()
-        self.ax.set_facecolor(T.COLOR_SURFACE)
+        self.ax.set_facecolor(T.COLOR_CANVAS)
         self.ax.set_axis_off()
         self.ax.text(
             0.5, 0.5, PLACEHOLDER_TEXT,
-            ha="center", va="center", color=T.COLOR_MUTED,
+            ha="center", va="center", color=T.COLOR_TEXT_MUTED,
             transform=self.ax.transAxes,
         )
         self.canvas.draw_idle()
@@ -87,19 +87,23 @@ class BaseChartWidget(QWidget):
     # 테마 (v2.0, view-design §7.1·§10.2)
     # ------------------------------------------------------------------ #
     def _apply_canvas_theme(self) -> None:
-        """figure 배경을 활성 팔레트 배경색으로 맞춘다."""
-        self.figure.set_facecolor(T.COLOR_BG)
+        """figure 배경을 활성 팔레트 캔버스 색으로 맞춘다(qce-design-guide §7)."""
+        self.figure.set_facecolor(T.COLOR_CANVAS)
 
     def _style_axes(self, ax) -> None:
-        """축 facecolor·tick·label·spine·title 색을 활성 팔레트에서 읽어 적용.
-        직교/극좌표 양쪽에서 동작하도록 spine 처리를 방어적으로 감싼다."""
-        ax.set_facecolor(T.COLOR_SURFACE)
-        ax.tick_params(colors=T.COLOR_TEXT)
+        """축 facecolor·tick·label·spine·title 색을 활성 팔레트에서 읽어 적용
+        (qce-design-guide §7 _style_axes). 데이터가 전면에 오도록 축은 캔버스에 녹이고,
+        스파인은 얇은 헤어라인, 눈금은 보조 텍스트색으로 둔다. 직교/극좌표 양쪽에서
+        동작하도록 spine 처리를 방어적으로 감싼다."""
+        ax.set_facecolor(T.COLOR_CANVAS)
+        ax.tick_params(colors=T.COLOR_TEXT_MUTED, labelsize=11)
         ax.xaxis.label.set_color(T.COLOR_TEXT)
         ax.yaxis.label.set_color(T.COLOR_TEXT)
         ax.title.set_color(T.COLOR_TEXT)
+        ax.set_axisbelow(True)
         for spine in ax.spines.values():
-            spine.set_color(T.COLOR_GRID)
+            spine.set_edgecolor(T.COLOR_HAIRLINE)
+            spine.set_linewidth(0.8)
 
     def _on_theme_changed(self) -> None:
         """테마 전환 시 재채색 후 보유 scores로 애니메이션 없이 최종 상태 재렌더."""

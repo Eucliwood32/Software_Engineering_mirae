@@ -174,7 +174,7 @@ class RadarChartWidget(BaseChartWidget):
         ax.set_yticks([T.GRID_STEP * k for k in range(1, 6)])  # 0.2 간격 5단계
         ax.set_yticklabels([])
         ax.set_xticks(self._angles)
-        ax.set_xticklabels(tick_labels, fontsize=fontsize, color=T.COLOR_TEXT)
+        ax.set_xticklabels(tick_labels, fontsize=fontsize, color=T.COLOR_TEXT_MUTED)
         ax.grid(color=T.COLOR_GRID)
         self._style_axes(ax)
 
@@ -217,11 +217,11 @@ class RadarChartWidget(BaseChartWidget):
         self._apply_canvas_theme()
         self.figure.clear()
         self.ax = self.figure.add_subplot(111)
-        self.ax.set_facecolor(T.COLOR_SURFACE)
+        self.ax.set_facecolor(T.COLOR_CANVAS)
         self.ax.set_axis_off()
         self.ax.text(
             0.5, 0.5, PLACEHOLDER_TEXT,
-            ha="center", va="center", color=T.COLOR_MUTED,
+            ha="center", va="center", color=T.COLOR_TEXT_MUTED,
             transform=self.ax.transAxes,
         )
         self.canvas.draw_idle()

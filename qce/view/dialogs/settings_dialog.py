@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
+from qce.view.style import tokens as T
 from qce.view.style.theme import theme_manager
 
 
@@ -37,12 +38,12 @@ class SettingsDialog(QDialog):
         self.setModal(True)
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(20, 18, 20, 18)
-        root.setSpacing(12)
+        root.setContentsMargins(T.SPACING_LG, T.SPACING_LG, T.SPACING_LG, T.SPACING_LG)
+        root.setSpacing(T.SPACING_MD)
 
         # --- 다크 모드 스위치 ---
         title = QLabel("화면")
-        title.setStyleSheet("font-weight: bold;")
+        title.setStyleSheet(f"font-size: {T.FONT_SUBTITLE}px; font-weight: 600;")
         root.addWidget(title)
 
         self._dark_switch = QCheckBox("다크 모드")
@@ -64,7 +65,7 @@ class SettingsDialog(QDialog):
 
         # --- Staff Credit ---
         staff_title = QLabel("Staff Credit")
-        staff_title.setStyleSheet("font-weight: bold;")
+        staff_title.setStyleSheet(f"font-size: {T.FONT_SUBTITLE}px; font-weight: 600;")
         root.addWidget(staff_title)
 
         for name, sid in self.STAFF:

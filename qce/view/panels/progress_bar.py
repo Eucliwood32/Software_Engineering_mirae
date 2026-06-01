@@ -15,8 +15,10 @@ class ProgressBar(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         self._bar = QProgressBar()
+        self._bar.setObjectName("analysis")        # QSS: 얇은 6px 막대·PRIMARY chunk
         self._bar.setRange(0, 100)
         self._bar.setValue(0)
+        self._bar.setTextVisible(False)
         layout.addWidget(self._bar)
         self._running = False
         self.setVisible(False)
