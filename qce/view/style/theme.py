@@ -106,7 +106,29 @@ class ThemeManager(QObject):
             pal.setColor(
                 QPalette.ColorGroup.Disabled, QPalette.ColorRole.ButtonText, disabled
             )
-        # 라이트는 기본 QPalette(시스템 표준)로 복원
+        else:
+            # 라이트: 빈 팔레트를 두면 시스템(다크)이 채워 배경 미전환 → 명시 적용
+            bg = QColor("#ffffff")
+            base = QColor("#ffffff")
+            text = QColor("#202124")
+            disabled = QColor("#9aa0a6")
+            pal.setColor(QPalette.ColorRole.Window, bg)
+            pal.setColor(QPalette.ColorRole.WindowText, text)
+            pal.setColor(QPalette.ColorRole.Base, base)
+            pal.setColor(QPalette.ColorRole.AlternateBase, QColor("#f8f9fa"))
+            pal.setColor(QPalette.ColorRole.Text, text)
+            pal.setColor(QPalette.ColorRole.Button, QColor("#f1f3f4"))
+            pal.setColor(QPalette.ColorRole.ButtonText, text)
+            pal.setColor(QPalette.ColorRole.ToolTipBase, base)
+            pal.setColor(QPalette.ColorRole.ToolTipText, text)
+            pal.setColor(QPalette.ColorRole.Highlight, QColor("#4285f4"))
+            pal.setColor(QPalette.ColorRole.HighlightedText, QColor("#ffffff"))
+            pal.setColor(
+                QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text, disabled
+            )
+            pal.setColor(
+                QPalette.ColorGroup.Disabled, QPalette.ColorRole.ButtonText, disabled
+            )
         app.setPalette(pal)
 
     def _hook_system_changes(self) -> None:

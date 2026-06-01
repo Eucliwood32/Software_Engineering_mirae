@@ -333,6 +333,7 @@ class AppController:
         self.orchestrator.start_merge_reaggregation(mapping)
 
     def on_new_analysis_requested(self) -> None:
+        self.main_window.set_save_enabled(False)  # 제출 화면 복귀 시 비활성
         if self.tracker:
             self.tracker.clear()
         self._last_scores = []
@@ -357,6 +358,7 @@ class AppController:
             self.tracker.clear()
         self._render_results()
         self.main_window.show_result()
+        self.main_window.set_save_enabled(bool(scores))  # 결과 존재 시에만 활성
         
     def _render_results(self) -> None:
         scores = self._last_scores
@@ -409,6 +411,7 @@ class AppController:
             panel.set_weight_warning(f"가중치 합계가 100%여야 합니다 (현재 {round(total * 100)}%)")
 
     def _on_analyze_clicked(self) -> None:
+        self.main_window.set_save_enabled(False)  # 로딩 중 비활성
         config = {
             "doc_paths": self._doc_paths,
             "git_path": self._git_path,

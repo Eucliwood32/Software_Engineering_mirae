@@ -48,8 +48,9 @@ class MainWindow(QMainWindow):
 
     def _build_menu(self) -> None:
         menu = self.menuBar().addMenu("파일")
-        act_save = menu.addAction("리포트 저장…")
-        act_save.triggered.connect(self.save_report_requested.emit)
+        self._act_save = menu.addAction("리포트 저장…")
+        self._act_save.triggered.connect(self.save_report_requested.emit)
+        self._act_save.setEnabled(False)  # 초기 비활성(제출·로딩 화면)
 
         # [v2.0] 우측 상단 끝 설정 버튼(코너 위젯, FR-5.8)
         self.settings_btn = QToolButton()
@@ -58,6 +59,10 @@ class MainWindow(QMainWindow):
         self.settings_btn.setAutoRaise(True)
         self.settings_btn.clicked.connect(self._open_settings)
         self.menuBar().setCornerWidget(self.settings_btn, Qt.Corner.TopRightCorner)
+
+    def set_save_enabled(self, enabled: bool) -> None:
+        """리포트 저장 메뉴 활성/비활성. 결과 화면+결과 존재 시에만 True."""
+        self._act_save.setEnabled(enabled)
 
     def _open_settings(self) -> None:
         dlg = SettingsDialog(self)

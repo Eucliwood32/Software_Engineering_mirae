@@ -22,13 +22,15 @@ class MessengerParser:
 
         records: list[MessengerRecord] = []
         skipped = 0
+        current: MessengerRecord | None = None  # 멀티라인 본문을 이어붙일 직전 record
 
         for line in raw.splitlines():
             line = line.strip()
             if not line:
                 continue
             if _DATE_RE.match(line):
-                continue                         # 날짜 구분줄 — record 아님
+                current = None                   # 날짜 구분줄 — record 아님, 본문 경계
+                continue
             m = _MSG_RE.match(line)
             if m:
                 ap, h, mn = m.group("ap"), int(m.group("h")), int(m.group("m"))
@@ -37,12 +39,17 @@ class MessengerParser:
                 elif ap == "오전" and h == 12:
                     h = 0
                 timestamp = f"{h:02d}:{mn:02d}"
-                records.append(MessengerRecord(
+                current = MessengerRecord(
                     author=m.group("author"),
                     timestamp=timestamp,
                     message=m.group("msg"),
-                ))
+                )
+                records.append(current)
+            elif current is not None:
+                # 카톡 멀티라인 메시지: 접두사 없는 이어진 본문을 직전 record에 합침(FR-3.1)
+                current.message += "\n" + line
             else:
+                # 메시지 컨텍스트가 없는 오염 줄(파일 머리·날짜줄 직후) — 방어적 skip(FR-3.2)
                 skipped += 1
 
         return ParseResult(records=records, skipped_lines=skipped)

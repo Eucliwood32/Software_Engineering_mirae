@@ -5,3 +5,16 @@ Traceback (most recent call last):
     def eventFilter(self, source, event):
     
 KeyboardInterrupt
+
+--- 2026-06-02 01:48:45 ---
+Traceback (most recent call last):
+  File "C:\coding\Software_Engineering\final_project\Software_Engineering_mirae\qce\view\main_window.py", line 62, in _open_settings
+    def _open_settings(self) -> None:
+    
+KeyboardInterrupt
+
+--- 2026-06-02 02:16:47 ---
+Traceback (most recent call last):
+  File "C:\coding\Software_Engineering\final_project\Software_Engineering_mirae\qce\view\main_window.py", line 64, in _open_settings
+    dlg.exec()
+KeyboardInterrupt

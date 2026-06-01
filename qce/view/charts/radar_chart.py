@@ -174,7 +174,7 @@ class RadarChartWidget(BaseChartWidget):
         ax.set_yticks([T.GRID_STEP * k for k in range(1, 6)])  # 0.2 간격 5단계
         ax.set_yticklabels([])
         ax.set_xticks(self._angles)
-        ax.set_xticklabels(tick_labels, fontsize=fontsize)
+        ax.set_xticklabels(tick_labels, fontsize=fontsize, color=T.COLOR_TEXT)
         ax.grid(color=T.COLOR_GRID)
         self._style_axes(ax)
 

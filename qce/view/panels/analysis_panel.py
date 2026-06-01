@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -50,12 +51,17 @@ class AnalysisPanel(QWidget):
             preset_row.addWidget(btn)
         root.addLayout(preset_row)
 
-        # 슬라이더 3개 (git/doc/msg)
+        # 슬라이더 3개 (git/doc/msg) — 라벨 폭 차이로 시작점이 어긋나지 않도록
+        # 그리드 컬럼 정렬: col0 라벨 / col1 슬라이더(stretch) / col2 값 라벨
         self._sliders: dict[str, QSlider] = {}
         self._value_labels: dict[str, QLabel] = {}
-        for key, label in (("w_git", "Git"), ("w_doc", "문서"), ("w_msg", "메신저")):
-            row = QHBoxLayout()
-            row.addWidget(QLabel(label))
+        slider_grid = QGridLayout()
+        slider_grid.setColumnStretch(1, 1)  # 슬라이더 컬럼만 늘어남
+        for row_idx, (key, label) in enumerate(
+            (("w_git", "Git"), ("w_doc", "문서"), ("w_msg", "메신저"))
+        ):
+            lbl = QLabel(label)
+            lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             s = QSlider(Qt.Orientation.Horizontal)
             s.setRange(0, _TICKS)
             s.setSingleStep(1)
@@ -63,15 +69,17 @@ class AnalysisPanel(QWidget):
             # valueChanged 대신 사용자 조작인 sliderMoved에 연결
             s.sliderMoved.connect(lambda val, k=key: self._on_slider_dragged(k, val))
             self._sliders[key] = s
-            row.addWidget(s)
 
             v_label = QLabel("0%")
             v_label.setMinimumWidth(40)
             v_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             self._value_labels[key] = v_label
-            row.addWidget(v_label)
 
-            root.addLayout(row)
+            slider_grid.addWidget(lbl, row_idx, 0)
+            slider_grid.addWidget(s, row_idx, 1)
+            slider_grid.addWidget(v_label, row_idx, 2)
+
+        root.addLayout(slider_grid)
 
         self._sum_label = QLabel("")
         root.addWidget(self._sum_label)

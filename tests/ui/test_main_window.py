@@ -51,5 +51,8 @@ def test_save_report_menu_signal(qtbot):
     # 파일 메뉴의 '리포트 저장…' 액션 트리거 → save_report_requested 발행
     menu = w.menuBar().actions()[0].menu()
     save_action = menu.actions()[0]
+    # 저장 메뉴는 초기 비활성(제출·로딩 화면). 결과 화면에서만 활성.
+    assert not save_action.isEnabled()
+    w.set_save_enabled(True)
     with qtbot.waitSignal(w.save_report_requested, timeout=1000):
         save_action.trigger()
