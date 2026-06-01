@@ -423,23 +423,33 @@ class ContributionAggregator:
             doc_details=doc_details, msg_details=msg_details,
         )
 
-        # 7. MemberScore 조립
-        scores = []
+        # 7. MemberScore 조립 및 total_score 비례 정규화 (합계 1.0 보장)
+        raw_totals = []
         for i, author in enumerate(authors):
             g = git_norm[i]
             d = doc_norm[i]
             m = msg_norm[i]
             
-            total = (g * rebalanced.get('git', 0.0)) + \
-                    (d * rebalanced.get('doc', 0.0)) + \
-                    (m * rebalanced.get('msg', 0.0))
+            raw_total = (g * rebalanced.get('git', 0.0)) + \
+                        (d * rebalanced.get('doc', 0.0)) + \
+                        (m * rebalanced.get('msg', 0.0))
+            raw_totals.append(raw_total)
             
+        sum_raw = sum(raw_totals)
+        if sum_raw == 0:
+            # 모두가 0점인 특이 케이스 (예: 파싱 결과가 모두 빈 값)
+            final_totals = [1.0 / len(authors) if authors else 0.0 for _ in authors]
+        else:
+            final_totals = [t / sum_raw for t in raw_totals]
+
+        scores = []
+        for i, author in enumerate(authors):
             score_obj = MemberScore(
                 author=author,
-                git_score=g,
-                doc_score=d,
-                msg_score=m,
-                total_score=round(total, 4),
+                git_score=git_norm[i],
+                doc_score=doc_norm[i],
+                msg_score=msg_norm[i],
+                total_score=round(final_totals[i], 4),
                 raw_additions=raw_additions[i],
                 raw_chars=raw_docs_vals[i],
                 raw_messages=raw_msgs_vals[i],

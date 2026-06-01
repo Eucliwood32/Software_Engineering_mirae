@@ -72,10 +72,23 @@ def test_single_member_dimensions_are_midpoint():
 
 
 def test_dimensions_do_not_affect_total_score():
-    """세부 축은 표시 전용 — total_score는 기존 git/doc score 가중합과 동일(STR-7)."""
+    """세부 축은 표시 전용 — total_score는 기존 git/doc score 가중합의 비율과 동일(STR-7)."""
     git = {"A": CommitStats(5, 500, 50), "B": CommitStats(3, 100, 10)}
     docs = {"A": 300, "B": 600}
     result = _agg().aggregate(git, docs, None, {"git": 0.5, "doc": 0.5, "msg": 0.0})
-    for s in result:
-        expected = round(s.git_score * 0.5 + s.doc_score * 0.5, 4)
+    raw_totals = [s.git_score * 0.5 + s.doc_score * 0.5 for s in result]
+    sum_raw = sum(raw_totals)
+    
+    for i, s in enumerate(result):
+        expected = round(raw_totals[i] / sum_raw, 4) if sum_raw > 0 else 0.5
         assert abs(s.total_score - expected) < 1e-4
+
+def test_total_score_sum_is_one():
+    """팀원들의 total_score 합계는 항상 1.0(100%)이어야 한다."""
+    git = {"A": CommitStats(5, 500, 50), "B": CommitStats(3, 100, 10), "C": CommitStats(10, 1000, 100)}
+    docs = {"A": 300, "B": 600, "C": 100}
+    msgs = {"A": 20, "B": 10, "C": 50}
+    result = _agg().aggregate(git, docs, msgs, WEIGHTS)
+    
+    total_sum = sum(s.total_score for s in result)
+    assert abs(total_sum - 1.0) < 1e-4
