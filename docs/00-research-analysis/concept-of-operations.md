@@ -26,7 +26,7 @@
 ### 1.3 본 문서가 다루지 않는 것
 - 구체적 함수 시그니처, 클래스 다이어그램 → `02-design-planning/` 참조
 - 테스트 케이스 정의 → `03-verification-validation/` 참조
-- 빌드/패키징 절차 → `06-implementation/build-and-package.md` 참조 (아이콘 적용 여부 등)
+- 빌드/패키징 절차 → `04-implementation/build-and-package.md` 참조 (아이콘 적용 여부 등)
 
 ### 1.4 참조 문서
 - Problem Statement v1.2
