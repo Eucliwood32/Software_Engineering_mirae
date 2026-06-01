@@ -21,6 +21,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QVBoxLayout,
     QWidget,
+    QScrollArea,
 )
 
 from qce.view.panels.analysis_panel import AnalysisPanel
@@ -49,13 +50,9 @@ class SubmitScreen(QWidget):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setAcceptDrops(True)
-        self._doc_count = 0
-        self._msg_count = 0
-        self._git_loaded = False
-        # 적재된 항목명(basename)을 종류별·적재순으로 보관 → 드롭존 목록 렌더에 사용
-        self._doc_names: list[str] = []
-        self._msg_names: list[str] = []
-        self._git_names: list[str] = []
+        self._doc_paths: list[str] = []
+        self._msg_paths: list[str] = []
+        self._git_paths: list[str] = []
 
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 24, 24, 24)
@@ -77,18 +74,23 @@ class SubmitScreen(QWidget):
         desc.setWordWrap(True)
         root.addWidget(desc)
 
-        # 드롭존: 빈 상태는 안내 문구, 1개 이상 적재 시 아이콘+파일명 목록 (§6.9 v1.6)
-        self._dropzone = QLabel(_DROP_HINT)
-        self._dropzone.setObjectName("dropzone")
-        self._dropzone.setTextFormat(Qt.TextFormat.RichText)
-        self._dropzone.setWordWrap(True)
-        self._dropzone.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._dropzone.setContentsMargins(16, 12, 16, 12)
-        self._dropzone.setMinimumHeight(140)
-        self._dropzone.setStyleSheet(
-            "QLabel#dropzone { border: 2px dashed #9aa0a6; border-radius: 8px; color: #80868b; }"
+        # 드롭존: 빈 상태는 안내 문구, 1개 이상 적재 시 아이콘+파일명+삭제 버튼 목록 (§6.9 v1.7)
+        self._dropzone_scroll = QScrollArea()
+        self._dropzone_scroll.setWidgetResizable(True)
+        self._dropzone_scroll.setObjectName("dropzone_scroll")
+        self._dropzone_scroll.setStyleSheet(
+            "QScrollArea#dropzone_scroll { border: 2px dashed #9aa0a6; border-radius: 8px; background: transparent; }"
         )
-        root.addWidget(self._dropzone, stretch=1)
+        self._dropzone_scroll.setMinimumHeight(140)
+
+        self._dropzone_container = QWidget()
+        self._dropzone_container.setStyleSheet("background: transparent;")
+        self._dropzone_layout = QVBoxLayout(self._dropzone_container)
+        self._dropzone_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self._dropzone_layout.setContentsMargins(16, 12, 16, 12)
+        
+        self._dropzone_scroll.setWidget(self._dropzone_container)
+        root.addWidget(self._dropzone_scroll, stretch=1)
 
         # 적재 피드백 + Git 선택
         row = QHBoxLayout()
@@ -102,6 +104,8 @@ class SubmitScreen(QWidget):
         # 가중치 패널 (FR-4.4) — analyze_clicked는 이 패널이 발행
         self.analysis_panel = AnalysisPanel()
         root.addWidget(self.analysis_panel)
+        
+        self._refresh_dropzone()
 
     # ------------------------------------------------------------------ #
     # Drag & Drop
@@ -124,16 +128,17 @@ class SubmitScreen(QWidget):
         files, git_repos = self._expand_paths(paths)
         docs, messengers = self._classify_paths(files)
         if docs:
-            self._doc_count += len(docs)
-            self._doc_names.extend(os.path.basename(d) for d in docs)
-            self.documents_dropped.emit(docs)
+            for d in docs:
+                if d not in self._doc_paths:
+                    self._doc_paths.append(d)
+            self.documents_dropped.emit(self._doc_paths)
         for m in messengers:
-            self._msg_count += 1
-            self._msg_names.append(os.path.basename(m))
+            if m not in self._msg_paths:
+                self._msg_paths.append(m)
             self.messenger_dropped.emit(m)
         for repo in git_repos:
-            self._git_loaded = True
-            self._git_names.append(os.path.basename(os.path.normpath(repo)))
+            if repo not in self._git_paths:
+                self._git_paths.append(repo)
             self.git_repo_chosen.emit(repo)
         self._refresh_loaded_label()
         self._refresh_dropzone()
@@ -187,49 +192,81 @@ class SubmitScreen(QWidget):
     def choose_git_repo(self) -> None:
         path = QFileDialog.getExistingDirectory(self, "Git 저장소 선택")
         if path:
-            self._git_loaded = True
-            self._git_names.append(os.path.basename(os.path.normpath(path)))
+            if path not in self._git_paths:
+                self._git_paths.append(path)
             self.git_repo_chosen.emit(path)
             self._refresh_loaded_label()
             self._refresh_dropzone()
 
     def _refresh_loaded_label(self) -> None:
-        git_txt = " · Git 저장소" if self._git_loaded else ""
+        if not self._doc_paths and not self._msg_paths and not self._git_paths:
+            self._loaded_label.setText("")
+            return
+        git_txt = f" · Git 저장소 {len(self._git_paths)}개" if self._git_paths else ""
         self._loaded_label.setText(
-            f"문서 {self._doc_count}개 · 메신저 {self._msg_count}개{git_txt} 적재됨"
+            f"문서 {len(self._doc_paths)}개 · 메신저 {len(self._msg_paths)}개{git_txt} 적재됨"
         )
 
     def _refresh_dropzone(self) -> None:
-        """적재 항목이 있으면 아이콘+파일명 목록을, 없으면 안내 문구를 드롭존에 렌더(§6.9 v1.6)."""
-        rows: list[tuple[str, str]] = []
-        rows += [(_ICON_DOC, name) for name in self._doc_names]
-        rows += [(_ICON_MSG, name) for name in self._msg_names]
-        rows += [(_ICON_GIT, f"{name} (Git 저장소)") for name in self._git_names]
+        """적재 항목이 있으면 아이콘+파일명+삭제버튼 목록을, 없으면 안내 문구를 드롭존에 렌더(§6.9 v1.7)."""
+        while self._dropzone_layout.count():
+            item = self._dropzone_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
 
-        if not rows:
-            self._dropzone.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self._dropzone.setText(_DROP_HINT)
+        if not self._doc_paths and not self._msg_paths and not self._git_paths:
+            hint = QLabel(_DROP_HINT)
+            hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            hint.setStyleSheet("color: #80868b;")
+            hint.setTextFormat(Qt.TextFormat.RichText)
+            hint.setWordWrap(True)
+            self._dropzone_layout.addWidget(hint)
             return
 
-        items = "".join(
-            f"<div style='margin:3px 0;'>{icon}&nbsp;&nbsp;"
-            f"{html.escape(label)}</div>"
-            for icon, label in rows
-        )
-        self._dropzone.setAlignment(
-            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft
-        )
-        self._dropzone.setText(f"<div style='font-size:11pt;'>{items}</div>")
+        for p in self._doc_paths:
+            self._add_item_widget(_ICON_DOC, p, "doc")
+        for p in self._msg_paths:
+            self._add_item_widget(_ICON_MSG, p, "msg")
+        for p in self._git_paths:
+            self._add_item_widget(_ICON_GIT, p, "git")
+
+    def _add_item_widget(self, icon: str, path: str, item_type: str) -> None:
+        row = QWidget()
+        row.setStyleSheet("background: transparent;")
+        lyt = QHBoxLayout(row)
+        lyt.setContentsMargins(0, 2, 0, 2)
+        
+        lbl = QLabel(f"{icon} {html.escape(os.path.basename(path))}" + (" (Git 저장소)" if item_type == "git" else ""))
+        lbl.setStyleSheet("font-size: 11pt;")
+        lyt.addWidget(lbl, stretch=1)
+        
+        btn = QPushButton("✕")
+        btn.setFixedSize(24, 24)
+        btn.setStyleSheet("QPushButton { border: none; font-weight: bold; color: #d93025; font-size: 11pt; } QPushButton:hover { background: #fce8e6; border-radius: 12px; }")
+        btn.clicked.connect(lambda _, t=item_type, p=path: self._remove_item(t, p))
+        lyt.addWidget(btn)
+        
+        self._dropzone_layout.addWidget(row)
+
+    def _remove_item(self, item_type: str, path: str) -> None:
+        if item_type == "doc" and path in self._doc_paths:
+            self._doc_paths.remove(path)
+            self.documents_dropped.emit(self._doc_paths)
+        elif item_type == "msg" and path in self._msg_paths:
+            self._msg_paths.remove(path)
+            self.messenger_dropped.emit(self._msg_paths[-1] if self._msg_paths else "")
+        elif item_type == "git" and path in self._git_paths:
+            self._git_paths.remove(path)
+            self.git_repo_chosen.emit(self._git_paths[-1] if self._git_paths else "")
+        self._refresh_loaded_label()
+        self._refresh_dropzone()
 
     def reset(self) -> None:
         """이전 분석 입력값(문서, 메신저, Git 상태 등)을 초기화한다."""
-        self._doc_count = 0
-        self._msg_count = 0
-        self._git_loaded = False
-        self._doc_names.clear()
-        self._msg_names.clear()
-        self._git_names.clear()
-        self._loaded_label.setText("")
+        self._doc_paths.clear()
+        self._msg_paths.clear()
+        self._git_paths.clear()
+        self._refresh_loaded_label()
         self._refresh_dropzone()
 
     # --- 테스트 접근자 ---
@@ -238,4 +275,7 @@ class SubmitScreen(QWidget):
 
     def loaded_files(self) -> list[str]:
         """드롭존에 표시 중인 적재 파일명 목록(문서→메신저→Git 순)."""
-        return [*self._doc_names, *self._msg_names, *self._git_names]
+        doc_names = [os.path.basename(p) for p in self._doc_paths]
+        msg_names = [os.path.basename(p) for p in self._msg_paths]
+        git_names = [os.path.basename(p) for p in self._git_paths]
+        return [*doc_names, *msg_names, *git_names]

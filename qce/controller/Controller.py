@@ -364,7 +364,8 @@ class AppController:
             scores = self.tracker.apply(self._last_scores)
             
         score_dicts = [dataclasses.asdict(s) for s in scores]
-        self.main_window.result.render(score_dicts, set())
+        missing = self._detect_missing(scores)
+        self.main_window.result.render(score_dicts, missing)
         
         if self.alias_extractor:
             identifiers = self.alias_extractor.extract_identifiers(

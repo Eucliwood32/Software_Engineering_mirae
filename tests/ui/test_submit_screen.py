@@ -5,7 +5,20 @@ import os
 
 from qce.view.panels.analysis_panel import AnalysisPanel
 from qce.view.panels.submit_screen import SubmitScreen
+from PyQt6.QtWidgets import QLabel, QWidget
 
+def get_dropzone_text(w: SubmitScreen) -> str:
+    texts = []
+    for i in range(w._dropzone_layout.count()):
+        item = w._dropzone_layout.itemAt(i)
+        if item and item.widget():
+            widget = item.widget()
+            if isinstance(widget, QLabel):
+                texts.append(widget.text())
+            elif isinstance(widget, QWidget):
+                for child in widget.findChildren(QLabel):
+                    texts.append(child.text())
+    return " ".join(texts)
 
 def test_classify_paths():
     docs, msgs = SubmitScreen._classify_paths(
@@ -82,18 +95,18 @@ def test_has_analysis_panel(qtbot):                             # TC-FR-5.5-05
     assert w.analysis_panel.analyze_enabled() is False
 
 
-def test_dropzone_shows_hint_when_empty(qtbot):                 # §6.9 v1.6
+def test_dropzone_shows_hint_when_empty(qtbot):                 # §6.9 v1.7
     w = SubmitScreen()
     qtbot.addWidget(w)
-    assert "끌어다 놓으세요" in w._dropzone.text()
+    assert "끌어다 놓으세요" in get_dropzone_text(w)
     assert w.loaded_files() == []
 
 
-def test_dropzone_lists_filenames(qtbot):                       # §6.9 v1.6
+def test_dropzone_lists_filenames(qtbot):                       # §6.9 v1.7
     w = SubmitScreen()
     qtbot.addWidget(w)
     w._handle_dropped_paths(["/in/report.docx", "/in/chat.txt"])
-    text = w._dropzone.text()
+    text = get_dropzone_text(w)
     assert "report.docx" in text
     assert "chat.txt" in text          # basename only, no path
     assert "/in/" not in text
@@ -101,13 +114,13 @@ def test_dropzone_lists_filenames(qtbot):                       # §6.9 v1.6
     assert w.loaded_files() == ["report.docx", "chat.txt"]
 
 
-def test_dropzone_reverts_to_hint_after_reset(qtbot):           # §6.9 v1.6
+def test_dropzone_reverts_to_hint_after_reset(qtbot):           # §6.9 v1.7
     w = SubmitScreen()
     qtbot.addWidget(w)
     w._handle_dropped_paths(["a.docx"])
-    assert "a.docx" in w._dropzone.text()
+    assert "a.docx" in get_dropzone_text(w)
     w.reset()
-    assert "끌어다 놓으세요" in w._dropzone.text()
+    assert "끌어다 놓으세요" in get_dropzone_text(w)
     assert w.loaded_files() == []
 
 
@@ -115,11 +128,11 @@ def test_reset_clears_counts(qtbot):
     p = SubmitScreen()
     qtbot.addWidget(p)
     p._handle_dropped_paths(["a.docx", "b.pptx", "c.txt"])
-    assert p._doc_count == 2
-    assert p._msg_count == 1
+    assert len(p._doc_paths) == 2
+    assert len(p._msg_paths) == 1
     assert "적재됨" in p.loaded_summary()
     
     p.reset()
-    assert p._doc_count == 0
-    assert p._msg_count == 0
+    assert len(p._doc_paths) == 0
+    assert len(p._msg_paths) == 0
     assert p.loaded_summary() == ""

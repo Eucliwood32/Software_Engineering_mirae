@@ -9,6 +9,8 @@ class GitAnalyzer:
 
     def analyze(self, repo_path: str) -> dict[str, CommitStats]:
         """{author_email: CommitStats}. 잘못된 경로/실패 → {} 반환."""
+        if not repo_path:
+            return {}
         try:
             result = subprocess.run(
                 ["git", "-C", repo_path, "log",
