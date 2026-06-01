@@ -54,7 +54,13 @@ class MemberScore:                      # FR-4.* 통합 결과
     signals: list[str] = field(default_factory=list)        # 표시 라벨 예: ["CAPPING","EW-02","ZSCORE"]
     signal_details: list[dict] = field(default_factory=list)  # 신호 카드 표시·FR-4.2c 예외용(아래)
     commit_dates: list[str] = field(default_factory=list)     # 커밋 일자(YYYY-MM-DD) 목록
+    dimensions: dict[str, float] = field(default_factory=dict) # [v1.7] 레이더 세부 축(가용 소스별 3키, 표시 전용)
 ```
+
+> **`dimensions` (v1.7, FR-5.1b 레이더 세부 축).** 가용 소스마다 3개의 세부 지표를 Min-Max 정규화(0.0~1.0)한 dict. 결측 소스의 키는 포함하지 않으므로 가용 소스 1·2·3개에 각각 3·6·9개 키가 담긴다. 세부 지표는 다음과 같으며 모두 *표시 전용*(STR-7, `total_score` 비반영)이다.
+> - **Git** (`CommitStats`에서 산출): `git_commits`(커밋 수) · `git_additions`(추가 라인, Capping+로그스케일) · `git_deletions`(삭제 라인, 로그스케일)
+> - **문서** (`doc_details`에서 산출): `doc_chars`(유효 글자수) · `doc_count`(작성 문서 수) · `doc_blocks`(문단·도형 등 구성 요소 수)
+> - **메신저** (`msg_details`에서 산출): `msg_count`(발화 수) · `msg_chars`(발화 글자수) · `msg_hours`(활동 시간대 수)
 
 > **`signal_details` 원소 구조 (FR-4.2/4.2b/4.2d 카드 표시·FR-4.2c 예외 처리용):**
 > - CAPPING: `{"type":"CAPPING","hash","date","additions"}`
@@ -246,8 +252,13 @@ class MemberScore:                      # FR-4.* 통합 결과
           docs: dict[str, int] | None,
           msgs: dict[str, int] | None,
           weights: dict[str, float],
+          doc_details: dict[str, dict] | None = None,   # [v1.7] 문서 세부 지표 {author:{chars,docs,blocks}}
+          msg_details: dict[str, dict] | None = None,   # [v1.7] 메신저 세부 지표 {author:{count,chars,hours}}
       ) -> list[MemberScore]:
-          """가용 소스만으로 종합 점수 산출(NFR-3.2). None 소스는 WeightRebalancer 경유."""
+          """가용 소스만으로 종합 점수 산출(NFR-3.2). None 소스는 WeightRebalancer 경유.
+          [v1.7] doc_details/msg_details가 주어지면 레이더 세부 축(dimensions)을 함께 산출한다.
+          하위호환: 두 인자 생략 시 git만 세부 축을 가지며(CommitStats에서 직접 산출),
+          종합 점수 계산은 종전과 동일하다."""
   ```
 - **파이프라인 단계:**
   1. **가용 소스 판별:** `git`, `docs`, `msgs` 중 `None`이 아닌 항목의 키 집합(`available`)을 구성한다.
@@ -257,8 +268,9 @@ class MemberScore:                      # FR-4.* 통합 결과
   5. **정규화:** 각 지표(Git 로그스케일 라인, 문서 글자수, 메신저 유효 발화수)를 `Normalizer.normalize()`로 0~1 척도로 변환한다.
   6. **이상 신호 탐지:** `AnomalySignalDetector.detect_frequency()` 및 `detect_zscore()`를 호출하여 신호를 수집한다. 신호는 `MemberScore.anomaly_flags`에 기록되지만 `total_score` 계산에는 사용되지 않는다 (STR-7, ConOps P5).
   7. **종합 점수 산출:** 정규화된 점수에 보정된 가중치를 곱하여 `total_score`를 계산한다: `total = git_score * w_git + doc_score * w_doc + msg_score * w_msg`.
-  8. **MemberScore 조립:** 팀원별로 `MemberScore` 인스턴스를 생성하여 리스트로 반환한다.
-- **병합 재집계 경로 (FR-5.7, Controller Design v1.1 §6 연동):** 결과 화면에서 병합 요청이 발생하면, Controller가 `AliasMapper.merge(raw, new_mapping)` 결과를 입력으로 이 메서드를 재호출한다. 인터페이스는 변경되지 않으며, 병합 후 팀원 집합이 달라지면 Min-Max 정규화 기준이 재산출된다 (FR-4.1). 이것이 시각적 점수 합산이 아니라 재집계여야 하는 이유이다.
+  8. **[v1.7] 세부 축(dimensions) 산출:** 가용 소스마다 3개 세부 지표를 각각 `Normalizer.normalize()`로 0~1 정규화하여 `MemberScore.dimensions`에 담는다. Git은 `CommitStats`의 커밋 수/추가 라인(Capping+로그)/삭제 라인(로그)에서, 문서·메신저는 `doc_details`/`msg_details`가 주어진 경우에만 각 3지표를 산출한다(미주어지면 해당 소스 키 생략). 세부 축은 *표시 전용*으로 `total_score`에 반영하지 않는다(STR-7). 결측 소스 키는 포함하지 않아 가용 소스 수에 따라 3·6·9키가 된다.
+  9. **MemberScore 조립:** 팀원별로 `MemberScore` 인스턴스를 생성하여 리스트로 반환한다.
+- **병합 재집계 경로 (FR-5.7, Controller Design v1.1 §6 연동):** 결과 화면에서 병합 요청이 발생하면, Controller가 `AliasMapper.merge(raw, new_mapping)` 결과를 입력으로 이 메서드를 재호출한다. [v1.7] `doc_details`/`msg_details`도 동일 매핑으로 병합해 함께 전달하므로 세부 축도 재산출된다. 병합 후 팀원 집합이 달라지면 Min-Max 정규화 기준이 재산출된다 (FR-4.1). 이것이 시각적 점수 합산이 아니라 재집계여야 하는 이유이다.
 - **출력 소비 방식 (INV-V1):** `aggregate()`의 반환값(`list[MemberScore]`)은 Controller(`AppController.on_analysis_completed`)에서 `dataclasses.asdict()`로 직렬화된 뒤 View에 전달된다. Model 레이어는 이 직렬화에 관여하지 않는다.
 
 ---
@@ -410,6 +422,7 @@ msgs: {author: count} ──┤                   │         │
 | v1.0 | 2026-05-30 | 최초 작성. 9개 BusinessLogic 컴포넌트 상세 설계. | QCE 개발팀 |
 | v1.1 | 2026-05-30 | (1) FR-4.2d → FR-4.2c 식별자 통일 (architecture-overview.md v1.1 동기화). (2) 참조 데이터 타입(§1.4) 추가. (3) 설계 불변식(§1.3) 추가 — PyQt6 금지, 파서 직접 import 금지, 판정 금지, 결정론 보장. (4) AliasMapper에 Unknown vs 미매핑 용어 구분 명시. (5) CacheManager에 저장 항목 화이트리스트 및 원자적 쓰기 절차 상세 추가. (6) ReportExporter에 경고 문구 형식 사양 추가. (7) 컴포넌트 간 데이터 흐름도(§3) 추가. (8) 아키텍처 RTM(§4) 추가. (9) 각 클래스에 코드 블록 형태의 시그니처 추가. | QCE 개발팀 |
 | **v1.2** | **2026-05-31** | **(1) AliasMapper §2.6에 호출 방식 명시 — 1차 분석=항등 매핑, 병합 재집계=결과 화면 사후 재호출 (FR-1.3 개정, Controller Design v1.1 §4 연동). (2) ContributionAggregator §2.7에 병합 재집계 경로 및 재정규화 필요성 명시 (FR-5.7). (3) ContributionAggregator §2.7에 출력 소비 방식(INV-V1 — asdict 직렬화는 Controller 책임) 명시. (4) 상위 문서 목록에 Controller Design v1.1 추가.** | QCE 개발팀 |
+| v1.4 | 2026-06-01 | 레이더 세부 축(view-design v1.7 연동): (1) `MemberScore`에 `dimensions: dict[str,float]` 필드 추가(가용 소스별 3 세부 지표, 표시 전용). (2) §2.7 `aggregate`에 선택적 `doc_details`/`msg_details` 인자 및 파이프라인 8단계(세부 축 산출) 신설, 병합 재집계 시 세부 데이터도 동일 매핑 병합. 세부 지표 정의: Git=커밋수/추가/삭제, 문서=글자수/문서수/구성요소, 메신저=발화수/발화량/시간대. `total_score` 비반영(STR-7) 유지. | QCE 개발팀 |
 | **v1.3** | **2026-05-31** | **구 SRS.md 폐지 반영 및 구현분 정합화(A1~A4). (1) §1.4 데이터 타입을 실제 코드 필드명으로 정합화(`raw_chars`·`raw_messages`·`signals`) 및 신규 필드 `signal_details`·`commit_dates`, `CommitStats.commits_list` 추가 + signal_details 원소 구조 명세. (2) §2.3 AnomalySignalDetector에 `detect_capping`·`detect_zscore_detail`·`build_signal_details` 추가, 실현 FR에 FR-4.2·FR-4.2d(Z-Score) 반영. (3) §2.4 WeightPresetManager에 `normalize`·`redistribute`·`match_preset`·`clamp`·`get_preset`·`preset_names` 추가(FR-4.4 보조 연산). (4) **§2.10 NormalizedSignalsTracker 신설(FR-4.2c 예외 처리)** — 번호 체계 4.2c=예외·4.2d=Z-Score (RR v1.5 정합). (5) **§2.11 AliasExtractor 신설(FR-1.3 결정론적 병합 후보 제안)**. (6) §2.6 AliasMapper에 AliasExtractor 후보 제안 연동 명시. (7) §4 RTM에 NormalizedSignalsTracker·AliasExtractor 행 추가. 상세 View 설계는 view-design.md, Controller 배선은 controller-design.md 참조.** | QCE 개발팀 |
 | v1.4 | 2026-06-01 | 사용자 피드백(UI/UX 개선) 반영: (1) §1.4 MemberScore 데이터 클래스에 시각화 툴팁 노출용 원시 데이터 필드(raw_additions, raw_chars, raw_messages) 추가. (2) §2.4 WeightPresetManager에 UI 가중치 실시간 비례 연동 및 텍스트 수치 표기를 지원하기 위한 redistribute 메서드의 UI 연동 책임 명시. | QCE 개발팀 |
 | **v1.5** | **2026-06-01** | **사용자 피드백(슬라이더 비례 분배 버그·표기 개선) 반영: (1) §2.4 WeightPresetManager `redistribute` 알고리즘 설명에 "나머지 두 축이 같은 비율로 증감"하는 동작을 명확히 기술(최댓값 축만 우선 줄어드는 기존 동작 교정). (2) 가중치 UI 표기 단위를 소수(1.00) 기준에서 퍼센트(100%) 기준으로 변경 — 프리셋 표, validate_sum, 합계 라벨, 경고 문구 포함.** | QCE 개발팀 |

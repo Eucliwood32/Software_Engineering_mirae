@@ -16,6 +16,9 @@ from qce.view.contract import (
     K_DOC,
     K_GIT,
     K_MSG,
+    K_DIMENSIONS,
+    DIM_AXES,
+    DIM_SOURCE_ORDER,
     SRC_DOC,
     SRC_GIT,
     SRC_MSG,
@@ -25,7 +28,7 @@ from qce.view.contract import (
 )
 from qce.view.style import tokens as T
 
-# 축 순서: Git / 문서 / 메신저 (점수 dict 키와 결측 소스명 매핑)
+# 레거시(폴백) 축 순서: Git / 문서 / 메신저 (점수 dict 키와 결측 소스명 매핑)
 _AXIS_SPEC = [
     ("Git", K_GIT, SRC_GIT),
     ("문서", K_DOC, SRC_DOC),
@@ -40,9 +43,53 @@ class RadarChartWidget(BaseChartWidget):
     def _create_axes(self) -> None:
         self.ax = self.figure.add_subplot(111, projection="polar")
 
+    def _resolve_axes(self) -> list[tuple[str, str]] | None:
+        """[v1.7] 점수 dict의 dimensions 기반 가변 세부 축. 가용 소스마다 DIM_AXES 순서로
+        (축 키, 라벨) 3개를 누적해 3/6/9축을 만든다. dimensions가 없으면 None(레거시 3축 폴백)."""
+        if not any(m.get(K_DIMENSIONS) for m in self._scores):
+            return None
+        present: set[str] = set()
+        for m in self._scores:
+            present |= set((m.get(K_DIMENSIONS) or {}).keys())
+        axes: list[tuple[str, str]] = []
+        for src in DIM_SOURCE_ORDER:
+            spec = DIM_AXES[src]
+            if spec[0][0] in present:        # 소스의 첫 세부 키 존재 = 해당 소스 가용
+                axes.extend(spec)
+        return axes or None
+
+    def _radii_for(self, m: dict) -> list[float]:
+        """현재 축 구성에 맞춰 멤버 m의 축별 반경(점수)을 추출한다."""
+        if self._dynamic:
+            dims = m.get(K_DIMENSIONS) or {}
+            return [float(dims.get(k, 0.0)) for k in (self._axis_keys or [])]
+        return [float(m[key]) for _label, key, _src in _AXIS_SPEC]
+
     def _render_static(self) -> None:
         self.ax.clear()
-        n_axes = len(self.AXIS_LABELS)
+
+        axes = self._resolve_axes()
+        self._dynamic = axes is not None
+        self._excluded_axis_labels: list[str] = []
+        self._axis_keys: list[str] | None
+        if axes is not None:
+            self._axis_keys = [k for k, _l in axes]
+            self._axis_labels = [label for _k, label in axes]
+            tick_labels = list(self._axis_labels)
+        else:
+            # 레거시 3축: 결측 축은 "(제외됨)" 라벨 표기
+            self._axis_keys = None
+            self._axis_labels = list(self.AXIS_LABELS)
+            tick_labels = []
+            for label, _key, src in _AXIS_SPEC:
+                if src in self._missing:
+                    marked = f"{label} (제외됨)"
+                    tick_labels.append(marked)
+                    self._excluded_axis_labels.append(marked)
+                else:
+                    tick_labels.append(label)
+
+        n_axes = len(self._axis_labels)
         # 각 축 각도 (꼭짓점)
         self._angles = [i / n_axes * 2 * math.pi for i in range(n_axes)]
 
@@ -52,17 +99,6 @@ class RadarChartWidget(BaseChartWidget):
         self.ax.set_yticks([T.GRID_STEP * k for k in range(1, 6)])  # 0.2 간격 5단계
         self.ax.set_yticklabels([])
         self.ax.set_xticks(self._angles)
-
-        # 결측 축은 "(제외됨)" 라벨 + 점선 표기
-        self._excluded_axis_labels: list[str] = []
-        tick_labels: list[str] = []
-        for label, _key, src in _AXIS_SPEC:
-            if src in self._missing:
-                marked = f"{label} (제외됨)"
-                tick_labels.append(marked)
-                self._excluded_axis_labels.append(marked)
-            else:
-                tick_labels.append(label)
         self.ax.set_xticklabels(tick_labels)
 
         # 팀 평균 폴리곤(회색 점선) + 팀원 폴리곤
@@ -70,7 +106,7 @@ class RadarChartWidget(BaseChartWidget):
         self._member_lines = []      # (line, fill) per member
         self._base_radii = []        # 최종 반경 목록 (애니 스케일 대상)
         for m in self._scores:
-            radii = [float(m[key]) for _label, key, _src in _AXIS_SPEC]
+            radii = self._radii_for(m)
             self._base_radii.append(radii)
             closed_theta = self._angles + [self._angles[0]]
             closed_r = [0.0] * (n_axes + 1)
@@ -85,9 +121,11 @@ class RadarChartWidget(BaseChartWidget):
         )
 
     def _draw_team_average(self) -> None:
+        per_member = [self._radii_for(m) for m in self._scores]
+        n_axes = len(self._axis_labels)
         avg = []
-        for _label, key, _src in _AXIS_SPEC:
-            vals = [float(m[key]) for m in self._scores]
+        for j in range(n_axes):
+            vals = [r[j] for r in per_member]
             avg.append(sum(vals) / len(vals) if vals else 0.0)
         closed_theta = self._angles + [self._angles[0]]
         closed_r = avg + [avg[0]]
@@ -138,7 +176,8 @@ class RadarChartWidget(BaseChartWidget):
     # ------------------------------------------------------------------ #
     @property
     def axis_labels(self) -> list[str]:
-        return list(self.AXIS_LABELS)
+        """현재 렌더된 축 라벨. 동적 모드면 세부 축(3/6/9개), 폴백/렌더 전이면 레거시 3축."""
+        return list(getattr(self, "_axis_labels", self.AXIS_LABELS))
 
     def is_polygon_visible(self, index: int) -> bool:
         line, _fill = self._member_lines[index]

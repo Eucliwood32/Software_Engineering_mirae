@@ -43,3 +43,7 @@ class MemberScore:
     signal_details: list[dict] = field(default_factory=list)
     # 커밋 발생 일자(YYYY-MM-DD) 목록. 타임라인 차트·상세 드릴다운용. Git 없으면 빈 목록.
     commit_dates: list[str] = field(default_factory=list)
+    # v1.7 레이더 세부 축 점수. 가용 소스별 3개 세부 지표를 0~1 정규화. 표시 전용(STR-7).
+    # 키 예: git_commits/git_additions/git_deletions, doc_chars/doc_count/doc_blocks,
+    # msg_count/msg_chars/msg_hours. 결측 소스 키는 미포함 → 가용 소스 1·2·3개에 3·6·9키.
+    dimensions: dict[str, float] = field(default_factory=dict)

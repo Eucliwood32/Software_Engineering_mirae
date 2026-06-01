@@ -53,6 +53,7 @@ class MemberScore:
     signals: List[str] = field(default_factory=list)
     signal_details: List[dict] = field(default_factory=list)
     commit_dates: List[str] = field(default_factory=list)
+    dimensions: Dict[str, float] = field(default_factory=dict)  # v1.7 레이더 세부 축(표시 전용)
 
 
 # ==========================================
@@ -349,11 +350,13 @@ class ContributionAggregator:
         self.anomaly_detector = AnomalySignalDetector()
         self.weight_rebalancer = WeightRebalancer()
         
-    def aggregate(self, 
+    def aggregate(self,
                   git: Optional[Dict[str, CommitStats]] = None,
                   docs: Optional[Dict[str, int]] = None,
                   msgs: Optional[Dict[str, int]] = None,
-                  weights: Optional[Dict[str, float]] = None) -> List[MemberScore]:
+                  weights: Optional[Dict[str, float]] = None,
+                  doc_details: Optional[Dict[str, dict]] = None,
+                  msg_details: Optional[Dict[str, dict]] = None) -> List[MemberScore]:
         if weights is None:
             weights = {"git": 0.4, "doc": 0.4, "msg": 0.2}
         
@@ -412,7 +415,14 @@ class ContributionAggregator:
         git_norm = self.normalizer.normalize(log_additions) if git is not None else [0.0] * len(authors)
         doc_norm = self.normalizer.normalize(raw_docs_vals) if docs is not None else [0.0] * len(authors)
         msg_norm = self.normalizer.normalize(raw_msgs_vals) if msgs is not None else [0.0] * len(authors)
-        
+
+        # 6b. 레이더 세부 축(dimensions) 산출 — 가용 소스별 3개 세부 지표 정규화 (v1.7, 표시 전용)
+        dimensions_list = self._compute_dimensions(
+            authors, git, docs, msgs,
+            git_norm=git_norm, doc_norm=doc_norm, msg_norm=msg_norm,
+            doc_details=doc_details, msg_details=msg_details,
+        )
+
         # 7. MemberScore 조립
         scores = []
         for i, author in enumerate(authors):
@@ -436,7 +446,8 @@ class ContributionAggregator:
                 capping_applied=capping_flags[i],
                 signals=[],
                 signal_details=[],
-                commit_dates=commit_dates_list[i]
+                commit_dates=commit_dates_list[i],
+                dimensions=dimensions_list[i],
             )
             scores.append(score_obj)
             
@@ -447,8 +458,62 @@ class ContributionAggregator:
             if s.author in details:
                 s.signal_details = details[s.author]
                 s.signals = sorted(list(set(d.get("type") for d in s.signal_details)))
-                
+
         return scores
+
+    @staticmethod
+    def _git_field(stats, name: str) -> float:
+        """git 값(CommitStats 또는 dict) 양쪽에서 필드를 읽는다."""
+        if hasattr(stats, name):
+            return getattr(stats, name) or 0
+        if isinstance(stats, dict):
+            return stats.get(name, 0) or 0
+        return 0
+
+    def _compute_dimensions(self, authors, git, docs, msgs, *,
+                            git_norm, doc_norm, msg_norm,
+                            doc_details, msg_details) -> List[Dict[str, float]]:
+        """레이더 세부 축(dimensions) 산출 (v1.7). 가용 소스마다 3개 세부 지표를 0~1 정규화한다.
+        문서·메신저는 세부 데이터(doc_details/msg_details)가 주어진 경우에만 키를 채운다.
+        모든 값은 표시 전용으로 total_score에 반영되지 않는다(STR-7)."""
+        n = len(authors)
+        dims: List[Dict[str, float]] = [dict() for _ in range(n)]
+
+        # Git: 커밋 수 / 코드 추가(이미 capping+log 정규화한 git_norm 재사용) / 코드 정리(삭제 log)
+        if git is not None:
+            commits_raw = [self._git_field(git.get(a), "commits") if a in git else 0 for a in authors]
+            del_log = [self.capping_scaler.log_scale(int(self._git_field(git.get(a), "deletions")))
+                       if a in git else 0.0 for a in authors]
+            commits_norm = self.normalizer.normalize(commits_raw)
+            del_norm = self.normalizer.normalize(del_log)
+            for i in range(n):
+                dims[i]["git_commits"] = commits_norm[i]
+                dims[i]["git_additions"] = git_norm[i]
+                dims[i]["git_deletions"] = del_norm[i]
+
+        # 문서: 글자수(doc_norm 재사용) / 문서 수 / 구성 요소 수
+        if docs is not None and doc_details:
+            count_raw = [doc_details.get(a, {}).get("docs", 0) for a in authors]
+            block_raw = [doc_details.get(a, {}).get("blocks", 0) for a in authors]
+            count_norm = self.normalizer.normalize(count_raw)
+            block_norm = self.normalizer.normalize(block_raw)
+            for i in range(n):
+                dims[i]["doc_chars"] = doc_norm[i]
+                dims[i]["doc_count"] = count_norm[i]
+                dims[i]["doc_blocks"] = block_norm[i]
+
+        # 메신저: 발화 수(msg_norm 재사용) / 발화 글자수 / 활동 시간대 수
+        if msgs is not None and msg_details:
+            chars_raw = [msg_details.get(a, {}).get("chars", 0) for a in authors]
+            hours_raw = [msg_details.get(a, {}).get("hours", 0) for a in authors]
+            chars_norm = self.normalizer.normalize(chars_raw)
+            hours_norm = self.normalizer.normalize(hours_raw)
+            for i in range(n):
+                dims[i]["msg_count"] = msg_norm[i]
+                dims[i]["msg_chars"] = chars_norm[i]
+                dims[i]["msg_hours"] = hours_norm[i]
+
+        return dims
 
 
 class NormalizedSignalsTracker:

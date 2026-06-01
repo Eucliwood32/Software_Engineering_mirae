@@ -235,6 +235,14 @@ Controller가 push하는 dict는 아래 키·타입을 정확히 만족한다. V
 | `signals` | `list[str]` | 예: `["CAPPING","EW-02","ZSCORE"]` (산점도 강조·요약 라벨용) |
 | `signal_details` | `list[dict]` | 신호 카드 표시(FR-4.2/4.2b/4.2d)·예외 처리(FR-4.2c)용 구조화 상세. 원소: `{"type","..."}` (CAPPING=hash/date/additions, EW-02=date/period_commits/baseline_avg, ZSCORE=metrics) |
 | `commit_dates` | `list[str]` | 커밋 일자(YYYY-MM-DD) 목록(타임라인·드릴다운용). Git 없으면 `[]` |
+| `dimensions` | `dict[str, float]` 0.0~1.0 | **[v1.7] 레이더 세부 축 점수.** 가용 소스마다 3개 세부 지표를 정규화한 값. 키는 소스별 고정(아래). 결측 소스의 키는 포함되지 않으므로, 가용 소스 1·2·3개에 각각 3·6·9개 키가 담긴다. 비어 있으면(`{}`) 레이더는 레거시 3축(Git/문서/메신저)으로 폴백한다. |
+
+> **`dimensions` 키 (v1.7, FR-5.1b 레이더 세부 축).** 소스가 가용할 때에만 해당 3키가 포함된다.
+> - **Git:** `git_commits`(커밋 수) · `git_additions`(코드 추가 라인) · `git_deletions`(코드 정리/삭제 라인)
+> - **문서:** `doc_chars`(유효 글자수) · `doc_count`(작성 문서 수) · `doc_blocks`(문단·도형 등 구성 요소 수)
+> - **메신저:** `msg_count`(발화 수) · `msg_chars`(발화 글자수) · `msg_hours`(활동 시간대 수, distinct HH)
+>
+> 각 값은 팀원 집합 전체에 대한 Min-Max 정규화 결과(0.0~1.0)다(단일 팀원이면 0.5). 모든 세부 지표는 *표시 전용*이며 `total_score`에는 기존 `git_score/doc_score/msg_score`만 반영된다(STR-7 유지). 산출은 Model(`ContributionAggregator`) 책임이다.
 
 **식별자 dict** (`AliasMappingDialog.populate`의 원소, FR-1.3)
 
@@ -260,6 +268,14 @@ K_CAPPING  = "capping_applied"
 K_ANOMALY  = "signals"
 K_SIGNAL_DETAILS = "signal_details"   # 신호 카드 표시·FR-4.2c 예외용 구조화 상세
 K_COMMIT_DATES   = "commit_dates"     # 타임라인/드릴다운용 커밋 일자
+K_DIMENSIONS     = "dimensions"       # [v1.7] 레이더 세부 축 점수(가용 소스별 3키)
+# 레이더 세부 축 사양: 소스 → [(축 키, 라벨)] ×3, 표시 순서 Git→문서→메신저
+DIM_SOURCE_ORDER = [SRC_GIT, SRC_DOC, SRC_MSG]
+DIM_AXES = {
+    SRC_GIT: [("git_commits", "커밋 수"), ("git_additions", "코드 추가"), ("git_deletions", "코드 정리")],
+    SRC_DOC: [("doc_chars", "문서 분량"), ("doc_count", "문서 수"), ("doc_blocks", "구성 요소")],
+    SRC_MSG: [("msg_count", "발화 수"), ("msg_chars", "발화량"), ("msg_hours", "활동 시간대")],
+}
 # 식별자 dict 키
 K_RAW_ID   = "raw_id"
 K_SOURCE   = "source"
@@ -555,12 +571,17 @@ class BarChartWidget(BaseChartWidget):
 ```
 
 ### 7.3 RadarChartWidget `radar_chart.py` (~340) — FR-5.1b
-Git/문서/메신저 3축. 팀원 N개 + 팀 평균 1개 = (N+1) 폴리곤, 동심원 0.2×5, 범례 토글, 4항목 툴팁, 결측 축 점선+"(제외됨)", 중심→최종 확장 애니메이션(팀원 순서대로 50ms 딜레이 순차 등장). **DashboardView가 중재한 산점도 클릭을 받아 해당 폴리곤을 1.5초 하이라이트**(결정 B).
+**[v1.7] 가변 세부 축 레이더.** 종전에는 Git/문서/메신저 3축(소스당 1축)이었으나, 소스가 1개뿐이면 축이 1~2개만 그려져 레이더 폴리곤이 성립하지 않는 문제가 있었다. 이제 **가용 소스마다 3개의 세부 지표 축**을 그려, 소스 1·2·3개에 각각 **3·6·9축** 레이더가 항상 정상적으로 그려지도록 한다. 세부 축 점수는 점수 dict의 `dimensions`(§5.3)에서 읽으며, 표시 순서·라벨은 `contract.DIM_AXES`를 단일 출처로 사용한다. 결측 소스는 축 자체가 생성되지 않는다(종전 "(제외됨)" 표기 대신 축 미생성). 팀원 N개 + 팀 평균 1개 = (N+1) 폴리곤, 동심원 0.2×5, 범례 토글, 4항목 툴팁, 중심→최종 확장 애니메이션, 산점도 클릭 1.5초 하이라이트(결정 B)는 유지된다.
+
+> **폴백.** 점수 dict에 `dimensions`가 없거나 비어 있으면(레거시 fixture·`dimensions={}`) 종전 동작인 **고정 3축(Git/문서/메신저)** + 결측 축 "(제외됨)" 표기로 폴백한다. 따라서 실제 앱(Controller가 `dimensions` 산출)은 가변 세부 축으로, 차원 정보 없는 합성 데이터는 레거시 3축으로 동작한다.
 
 ```python
 class RadarChartWidget(BaseChartWidget):
-    AXIS_LABELS = ["Git", "문서", "메신저"]
+    AXIS_LABELS = ["Git", "문서", "메신저"]   # 폴백(레거시) 기본 축
     def render(self, scores: list[dict], missing: set[str]) -> None: ...
+    def _resolve_axes(self) -> list[tuple[str, str]] | None:
+        """[v1.7] dimensions가 있으면 가용 소스별 (축 키, 라벨) 목록(3/6/9개)을 DIM_AXES
+        순서로 구성, 없으면 None(레거시 3축 폴백)."""
     def _draw_frame(self, progress: float) -> None:
         """각 꼭짓점 반경 = score * progress, 팀원 i는 50ms*i 딜레이 후 등장."""
     def _draw_team_average(self) -> None: ...
@@ -572,10 +593,10 @@ class RadarChartWidget(BaseChartWidget):
         """4항목: 팀원명 / 지표명 / 정규화 점수 / 원시값."""
     # --- 테스트 접근자 ---
     @property
-    def axis_labels(self) -> list[str]: ...                 # test_radar_vertex_labels
+    def axis_labels(self) -> list[str]: ...                 # 가변 세부 축 라벨(폴백 시 3축). test_radar_vertex_labels
     def is_polygon_visible(self, index: int) -> bool: ...    # test_radar_toggle_hide
     @property
-    def excluded_axis_labels(self) -> list[str]: ...         # test_radar_missing_data ("(제외됨)")
+    def excluded_axis_labels(self) -> list[str]: ...         # 레거시 폴백 결측 축("(제외됨)"). test_radar_missing_data
 ```
 
 ### 7.4 ScatterChartWidget `scatter_chart.py` (~390) — FR-5.1c
@@ -749,4 +770,5 @@ GRID_STEP          = 0.2
 | **v1.4** | **2026-05-31** | **구 SRS.md 폐지 반영 — 이상 신호 카드 UI·신원 매핑 추천 도입. (1) **§6.12 AnomalySignalPanel 신설**(FR-4.2/4.2b/4.2d 신호 카드 + FR-4.2c "정상으로 표시" 버튼, `signal_dismissed` 중계만). (2) §6.6 DashboardView에 `signals_panel`·`signal_dismissed` 통합. (3) §6.11 ResultScreen에 `signal_dismissed` 중계·`set_suggested_mapping` 추가. (4) §6.3 AliasMappingDialog에 `apply_suggested`(AliasExtractor 추천 기본선택, 자동병합 아님) 추가. (5) §5.1에 `signal_dismissed`, §5.2에 `set_suggested_mapping` 행 추가. (6) §5.3 점수 dict 스키마에 `signal_details`·`commit_dates` 키 및 contract 상수 `K_SIGNAL_DETAILS`·`K_COMMIT_DATES` 추가, signals 예시 갱신. (7) §12 RTM에 AnomalySignalPanel 행 추가. Model 측 상세는 model-business-logic-design.md v1.3 §2.10·§2.11, 배선은 controller-design.md 참조. | QCE 개발팀 |
 | v1.5 | 2026-06-01 | 사용자 피드백(UI/UX 개선 및 버그 수정) 반영: (1) §6.3 AliasMappingDialog 미선택 시 OK 버튼 방어 로직 추가. (2) §6.5 AnalysisPanel에 설명 문구('작업 종류 별 반영 비율') 및 실시간 숫자 표기 갱신 메서드 추가. (3) §6.6/§7.1 placeholder 안내 문구를 '분석할 데이터가 없습니다.'로 변경. (4) §6.9 SubmitScreen에 입력 데이터 리셋(clear_inputs) 및 파일명("없음" 포함) 노출 사양 추가. (5) §6.11 ResultScreen에 매핑 취소 UI 증발 방지 메서드(reset_mapping_state) 추가. (6) §7.2/§7.4 차트 툴팁 구성에 원시 데이터(Raw data) 노출 구체화. | QCE 개발팀 |
 | v1.6 | 2026-06-01 | 사용자 피드백(드롭존 UX 개선) 반영: §6.9 SubmitScreen 드롭존이 적재 상태에 따라 분기 렌더하도록 사양 추가 — 빈 상태는 기존 안내 문구, 1개 이상 적재 시 종류별 아이콘(문서 📄 / 메신저 💬 / Git 🗂) + 파일명(basename) 목록을 좌측 정렬로 표시. `_refresh_dropzone`·`loaded_files()` 접근자 명시. | QCE 개발팀 |
+| v1.7 | 2026-06-01 | 사용자 피드백(레이더 세부 축) 반영: §7.3 RadarChartWidget을 **가용 소스별 3 세부 축**(소스 1·2·3개 → 3·6·9축)으로 개정, 단일 소스에서도 폴리곤이 정상 형성되도록 함. (1) §5.3 점수 dict에 `dimensions: dict[str,float]` 키 및 소스별 세부 지표 정의 추가(Git=커밋수/추가/정리, 문서=분량/문서수/구성요소, 메신저=발화수/발화량/시간대). (2) contract 스니펫에 `K_DIMENSIONS`·`DIM_AXES`·`DIM_SOURCE_ORDER` 추가. (3) §7.3 가변 축 렌더 + `dimensions` 부재 시 레거시 3축 폴백 명시, `_resolve_axes` 접근자 추가. 세부 축은 표시 전용으로 `total_score` 비반영(STR-7 유지). Model 측 산출은 model-business-logic-design v1.4 §2.7 참조. | QCE 개발팀 |
 | **v1.7** | **2026-06-01** | **사용자 피드백(슬라이더 비례 분배·표기 개선) 반영: (1) §6.5 AnalysisPanel 슬라이더 범위 표기를 0.00~1.00에서 0%~100%(step 5%)로 변경. (2) 합계 라벨·경고 문구를 퍼센트 단위(`"합계: 100%"`, `"가중치 합계가 100%여야 합니다"`)로 변경. (3) 슬라이더 비례 재분배 동작 설명에 "나머지 슬라이더들이 기존 비율을 유지하며 같은 비율로 자동 조절" 명시.** | QCE 개발팀 |

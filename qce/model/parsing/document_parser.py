@@ -25,6 +25,82 @@ class DocumentParser:
         except Exception:
             return {}
 
+    def parse_detailed(self, path: str) -> dict[str, dict]:
+        """레이더 세부 축(v1.7)용 상세 추출. {작성자: {"chars", "blocks"}}.
+        chars=유효 글자수, blocks=문단·텍스트박스 등 구성 요소 수. 손상/미지원 → {}."""
+        ext = path.lower().rsplit(".", 1)[-1]
+        try:
+            if ext == "docx":
+                return self._detail_docx(path)
+            elif ext == "pptx":
+                return self._detail_pptx(path)
+            elif ext == "hwpx":
+                return self._detail_hwpx(path)
+            return {}
+        except Exception:
+            return {}
+
+    def _detail_docx(self, path: str) -> dict[str, dict]:
+        from docx import Document
+        doc = Document(path)
+        author = doc.core_properties.author or "Unknown"
+        paras = [p.text for p in doc.paragraphs]
+        chars = len(_strip_whitespace(" ".join(paras)))
+        blocks = sum(1 for t in paras if t.strip())
+        return {author: {"chars": chars, "blocks": blocks}}
+
+    def _detail_pptx(self, path: str) -> dict[str, dict]:
+        from pptx import Presentation
+        prs = Presentation(path)
+        author = prs.core_properties.last_modified_by or "Unknown"
+        chars = 0
+        blocks = 0
+        for slide in prs.slides:
+            for shape in slide.shapes:
+                if shape.has_text_frame:
+                    blocks += 1
+                    for para in shape.text_frame.paragraphs:
+                        for run in para.runs:
+                            chars += len(_strip_whitespace(run.text))
+        return {author: {"chars": chars, "blocks": blocks}}
+
+    def _detail_hwpx(self, path: str) -> dict[str, dict]:
+        import xml.etree.ElementTree as ET
+
+        with zipfile.ZipFile(path, "r") as zf:
+            author = "Unknown"
+            meta_candidates = [
+                n for n in zf.namelist()
+                if "metadata" in n.lower() or "meta-inf" in n.lower()
+            ]
+            for mc in meta_candidates:
+                try:
+                    root = ET.fromstring(zf.read(mc))
+                    for elem in root.iter():
+                        if elem.tag.split("}")[-1].lower() == "creator" and elem.text:
+                            author = elem.text.strip() or "Unknown"
+                            break
+                except Exception:
+                    pass
+
+            chars = 0
+            blocks = 0
+            section_files = [
+                n for n in zf.namelist()
+                if re.search(r"section\d*\.xml$", n, re.IGNORECASE)
+            ]
+            for sf in section_files:
+                try:
+                    root = ET.fromstring(zf.read(sf))
+                    for elem in root.iter():
+                        if elem.tag.split("}")[-1] == "t" and elem.text:
+                            chars += len(_strip_whitespace(elem.text))
+                            blocks += 1
+                except Exception:
+                    pass
+
+        return {author: {"chars": chars, "blocks": blocks}}
+
     def count_shapes(self, path: str) -> int:
         """문서 내 텍스트박스 포함 도형 개수."""
         ext = path.lower().rsplit(".", 1)[-1]

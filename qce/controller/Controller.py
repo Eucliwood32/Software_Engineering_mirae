@@ -22,7 +22,7 @@ except ImportError:
 
 class AnalysisWorkerSignals(QObject):
     progress = pyqtSignal(int)          # 0~100 진행률
-    completed = pyqtSignal(tuple)       # (list[MemberScore], raw_git, raw_docs, raw_msgs, weights)
+    completed = pyqtSignal(tuple)       # (scores, raw_git, raw_docs, raw_msgs, weights, doc_details, msg_details)
     failed = pyqtSignal(str)            # 오류 메시지
 
 class AnalysisWorker(QRunnable):
@@ -53,18 +53,30 @@ class AnalysisWorker(QRunnable):
             
             self.signals.progress.emit(10)
             doc_data = None
+            doc_details = None
             git_data = None
             msg_data = None
-            
+            msg_details = None
+
             if doc_parser:
                 try:
                     doc_paths = self.config.get('doc_paths') or ([self.config['doc_path']] if self.config.get('doc_path') else [])
                     doc_data = {}
+                    doc_details = {}        # {author: {"chars","blocks","docs"}} — 레이더 세부 축(v1.7)
                     for dp in doc_paths:
-                        for author, chars in doc_parser.parse(dp).items():
+                        detailed = (doc_parser.parse_detailed(dp)
+                                    if hasattr(doc_parser, 'parse_detailed')
+                                    else {a: {"chars": c} for a, c in doc_parser.parse(dp).items()})
+                        for author, d in detailed.items():
+                            chars = d.get("chars", 0)
                             doc_data[author] = doc_data.get(author, 0) + chars
+                            entry = doc_details.setdefault(author, {"chars": 0, "blocks": 0, "docs": 0})
+                            entry["chars"] += chars
+                            entry["blocks"] += d.get("blocks", 0)
+                            entry["docs"] += 1
                     if not doc_data:
                         doc_data = None
+                        doc_details = None
                 except Exception as e: print(f"Doc parsing error (ignored): {e}")
             self.signals.progress.emit(30)
             
@@ -74,28 +86,41 @@ class AnalysisWorker(QRunnable):
             self.signals.progress.emit(50)
             
             if msg_parser:
-                try: 
+                try:
                     parse_result = msg_parser.parse(self.config.get('msg_path', ''))
                     msg_counts = {}
+                    msg_details = {}      # {author: {"count","chars","hours"}} — 레이더 세부 축(v1.7)
+                    hour_sets: dict = {}  # {author: set(HH)} → 활동 시간대 수 산출용
                     for rec in parse_result.records:
-                        if hasattr(rec, 'author'):
-                            msg_counts[rec.author] = msg_counts.get(rec.author, 0) + 1
-                        elif isinstance(rec, str):
-                            msg_counts["Unknown"] = msg_counts.get("Unknown", 0) + 1
+                        author = rec.author if hasattr(rec, 'author') else "Unknown"
+                        msg_counts[author] = msg_counts.get(author, 0) + 1
+                        entry = msg_details.setdefault(author, {"count": 0, "chars": 0, "hours": 0})
+                        entry["count"] += 1
+                        entry["chars"] += len(getattr(rec, 'message', '') or '')
+                        ts = getattr(rec, 'timestamp', '') or ''
+                        hour_sets.setdefault(author, set()).add(ts.split(":")[0])
+                    for author, hours in hour_sets.items():
+                        msg_details[author]["hours"] = len(hours)
                     msg_data = msg_counts
+                    if not msg_data:
+                        msg_details = None
                 except Exception as e: print(f"Messenger parsing error (ignored): {e}")
             self.signals.progress.emit(70)
             
             mapped_git = git_data
             mapped_docs = doc_data
             mapped_msgs = msg_data
-            
+            mapped_doc_details = doc_details
+            mapped_msg_details = msg_details
+
             if alias_mapper:
                 identity = self._create_identity_mapping(git_data, doc_data, msg_data)
                 mapped_git = alias_mapper.merge(git_data, identity) if git_data else None
                 mapped_docs = alias_mapper.merge(doc_data, identity) if doc_data else None
                 mapped_msgs = alias_mapper.merge(msg_data, identity) if msg_data else None
-            
+                mapped_doc_details = alias_mapper.merge(doc_details, identity) if doc_details else None
+                mapped_msg_details = alias_mapper.merge(msg_details, identity) if msg_details else None
+
             self.signals.progress.emit(85)
             scores = []
             weights = self.config.get('weights', {"git": 0.4, "docs": 0.4, "msg": 0.2})
@@ -104,14 +129,16 @@ class AnalysisWorker(QRunnable):
                     git=mapped_git,
                     docs=mapped_docs,
                     msgs=mapped_msgs,
-                    weights=weights
+                    weights=weights,
+                    doc_details=mapped_doc_details,
+                    msg_details=mapped_msg_details,
                 )
-            
+
             if cache_manager and scores:
                 cache_manager.save({"scores": [score.__dict__ for score in scores], "timestamp": "now"})
-            
+
             self.signals.progress.emit(100)
-            self.signals.completed.emit((scores, git_data, doc_data, msg_data, weights))
+            self.signals.completed.emit((scores, git_data, doc_data, msg_data, weights, doc_details, msg_details))
             
         except Exception as e:
             err_msg = f"분석 중 치명적 오류 발생: {str(e)}\n{traceback.format_exc()}"
@@ -127,13 +154,16 @@ class MergeWorker(QRunnable):
     """
     병합 재집계 (FR-5.7): 파서를 생략하고 원시 데이터를 기반으로 AliasMapper와 ContributionAggregator 재호출
     """
-    def __init__(self, raw_git, raw_docs, raw_msgs, weights, mapping):
+    def __init__(self, raw_git, raw_docs, raw_msgs, weights, mapping,
+                 raw_doc_details=None, raw_msg_details=None):
         super().__init__()
         self.raw_git = raw_git
         self.raw_docs = raw_docs
         self.raw_msgs = raw_msgs
         self.weights = weights
         self.mapping = mapping
+        self.raw_doc_details = raw_doc_details
+        self.raw_msg_details = raw_msg_details
         self.signals = MergeWorkerSignals()
 
     def run(self):
@@ -148,12 +178,16 @@ class MergeWorker(QRunnable):
             mapped_git = self.raw_git
             mapped_docs = self.raw_docs
             mapped_msgs = self.raw_msgs
-            
+            mapped_doc_details = self.raw_doc_details
+            mapped_msg_details = self.raw_msg_details
+
             if alias_mapper:
                 mapped_git = alias_mapper.merge(self.raw_git, self.mapping) if self.raw_git else None
                 mapped_docs = alias_mapper.merge(self.raw_docs, self.mapping) if self.raw_docs else None
                 mapped_msgs = alias_mapper.merge(self.raw_msgs, self.mapping) if self.raw_msgs else None
-            
+                mapped_doc_details = alias_mapper.merge(self.raw_doc_details, self.mapping) if self.raw_doc_details else None
+                mapped_msg_details = alias_mapper.merge(self.raw_msg_details, self.mapping) if self.raw_msg_details else None
+
             self.signals.progress.emit(60)
             scores = []
             if aggregator:
@@ -161,7 +195,9 @@ class MergeWorker(QRunnable):
                     git=mapped_git,
                     docs=mapped_docs,
                     msgs=mapped_msgs,
-                    weights=self.weights
+                    weights=self.weights,
+                    doc_details=mapped_doc_details,
+                    msg_details=mapped_msg_details,
                 )
             
             self.signals.progress.emit(90)
@@ -188,6 +224,8 @@ class AnalysisOrchestrator(QObject):
         self._raw_git = None
         self._raw_docs = None
         self._raw_msgs = None
+        self._raw_doc_details = None
+        self._raw_msg_details = None
         self._current_weights = None
 
     def start_analysis(self, config: dict) -> None:
@@ -206,17 +244,20 @@ class AnalysisOrchestrator(QObject):
             return
         self.is_analyzing = True
         
-        worker = MergeWorker(self._raw_git, self._raw_docs, self._raw_msgs, self._current_weights, mapping)
+        worker = MergeWorker(self._raw_git, self._raw_docs, self._raw_msgs, self._current_weights, mapping,
+                             self._raw_doc_details, self._raw_msg_details)
         worker.signals.progress.connect(self.progress.emit)
         worker.signals.completed.connect(self._on_merge_worker_completed)
         worker.signals.failed.connect(self._on_worker_failed)
         self.thread_pool.start(worker)
         
     def _on_analysis_worker_completed(self, result_tuple: tuple) -> None:
-        scores, git_data, doc_data, msg_data, weights = result_tuple
+        scores, git_data, doc_data, msg_data, weights, doc_details, msg_details = result_tuple
         self._raw_git = git_data
         self._raw_docs = doc_data
         self._raw_msgs = msg_data
+        self._raw_doc_details = doc_details
+        self._raw_msg_details = msg_details
         self._current_weights = weights
         
         self.is_analyzing = False
