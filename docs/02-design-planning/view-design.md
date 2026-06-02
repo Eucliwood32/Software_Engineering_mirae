@@ -378,7 +378,7 @@ class SaveReportDialog(QObject):
 ```
 
 ### 6.5 AnalysisPanel `analysis_panel.py` (~270) — FR-4.4
-프리셋 버튼 3개 + 슬라이더 3개(0%~100%, step 5%) + 합계 라벨(`"합계: 100%"`) + [분석 시작]. 합계 ≠ 100%이면 버튼 비활성 + 경고. 하나의 슬라이더를 조절하면 나머지 슬라이더들이 **기존 비율을 유지하며 같은 비율로** 자동 조절되어 항상 합계 100%를 유지한다.
+프리셋 버튼 3개 + 슬라이더 3개(0%~100%, step 5%) + 합계 라벨(`"합계: 100%"`) + [분석 시작]. 합계 ≠ 100%이면 버튼 비활성 + 경고(단, 가중치가 0%일 때는 경고 없음). 하나의 슬라이더를 조절하면 나머지 슬라이더들이 **기존 비율을 유지하며 같은 비율로** 자동 조절되어 항상 합계 100%를 유지한다. 처음 시작 시 버튼은 기본적으로 비활성화된다.
 
 ```python
 class AnalysisPanel(QWidget):
@@ -395,7 +395,7 @@ class AnalysisPanel(QWidget):
     def current_weights(self) -> dict[str, float]: ...
     def set_analyze_enabled(self, enabled: bool) -> None: ...
     def set_weight_warning(self, msg: str | None) -> None:
-        """msg=None이면 경고 해제. 형식 '가중치 합계가 100%여야 합니다 (현재 XX%)'."""
+        """msg=None이면 경고 해제. 합계 0%일 때는 msg=None, 그 외 오차일 때는 '가중치 합계가 100%여야 합니다 (현재 XX%)'."""
     def update_weight_labels(self) -> None:
         """[개선] 슬라이더 조작 시 비례 연동된 현재 가중치 값을 퍼센트(%)로 실시간 표기한다."""
 ```
@@ -447,7 +447,7 @@ class ProgressBar(QWidget):
 ```
 
 ### 6.9 SubmitScreen `submit_screen.py` (~180) — FR-5.5
-메인(제출) 화면. 중앙 상단에 **대형 로고(`QCE_Logo.png`)와 서브타이틀("QCE - 부탁해 꼬마선장")**을 큼직하게 배치하고, 그 아래 **멀티포맷 드래그앤드롭 존**(.pptx/.docx/.hwpx 문서 + .txt 카톡), Git 저장소 선택 버튼, **AnalysisPanel(가중치, FR-4.4)**, [분석 시작] 버튼을 배치한다. 드롭 이벤트를 확장자로 분기해 Signal로 올린다(기존 MainWindow의 드롭 로직 이동). 
+메인(제출) 화면. 중앙 상단에 **대형 로고(`qce/QCE_Logo.png`)와 서브타이틀("QCE - 부탁해 꼬마선장")**을 큼직하게 배치하고, 그 아래 **멀티포맷 드래그앤드롭 존**(.pptx/.docx/.hwpx 문서 + .txt 카톡), Git 저장소 선택 버튼, **AnalysisPanel(가중치, FR-4.4)**, [분석 시작] 버튼을 배치한다. 드롭 이벤트를 확장자로 분기해 Signal로 올린다(기존 MainWindow의 드롭 로직 이동). 
 전체 화면 크기에 비례하여 자동으로 맞춰지는 **동적 패딩(좌우 폭 15%, 상하 10%)**을 적용한다.
 
 **[v1.7 개선] 개별 항목 삭제가 가능한 적재 파일 목록.** 드롭존은 적재 상태에 따라 두 가지로 렌더한다. ① **하나도 적재되지 않았을 때**는 기존 안내 문구(`_DROP_HINT`: "여기에 문서…를 끌어다 놓으세요")를 가운데 정렬로 표시한다. ② **하나라도 적재되면** 적재된 항목을 스크롤 영역(`QScrollArea` 또는 `QListWidget`) 내에 *종류별 아이콘 + 파일명 + [X] 삭제 버튼*으로 표시한다. [X] 클릭 시 해당 항목을 내부 목록에서 제외하고 `inputs_changed` 등 Signal을 통해 최신 전체 목록을 다시 상위로 올리며 UI를 갱신한다. 파일명은 **basename**만 노출한다. 드롭존 하단의 `_loaded_label`은 종전대로 요약을 표시한다.
@@ -485,7 +485,7 @@ class LoadingScreen(QWidget):
 
 ### 6.11 ResultScreen `result_screen.py` (~150) — FR-5.7 / FR-5.2
 결과 화면. **[v3.1] 세로 스크롤 페이지**로 결과를 한 항목씩 읽어 내려가도록 구성한다(요구사항 3 — 웹 문서 느낌의 넉넉한 좌우 패딩 `SPACING_SECTION` + 섹션 간 `SPACING_SECTION` 간격, `QScrollArea`로 세로 스크롤·가로 스크롤 비활성). **진입 시마다 스크롤을 최상단으로 강제 초기화**하며, 화면 폭에 맞춰 **좌우 15%, 상하 10%의 동적 패딩**을 적용한다.
-표시 순서(요구사항 3-2): **페이지 타이틀("프로젝트 분석 결과", `#pageTitle`) → (타이틀 하단 간격 0.5배 축소) → WarningBanner(§6.7) → DashboardView(막대→산점도→레이더→이상 신호, 각 섹션 타이틀 포함, §6.6) → 인원 합치기 섹션(`#sectionTitle` + 설명 + AliasMappingDialog 재사용, §6.3) → 하단 [새 분석]·[리포트 저장] 나란히**. 한 화면에 모든 정보를 욱여넣지 않고 스크롤로 천천히 본다.
+표시 순서(요구사항 3-2): **페이지 타이틀(로고 `qce/QCE_Logo.png` + "프로젝트 분석 결과", `#pageTitle`) → (타이틀 하단 간격 0.5배 축소) → WarningBanner(§6.7) → DashboardView(막대→산점도→레이더→이상 신호, 각 섹션 타이틀 포함, §6.6) → 인원 합치기 섹션(`#sectionTitle` + 설명 + AliasMappingDialog 재사용, §6.3) → 하단 [새 분석]·[리포트 저장] 나란히**. 한 화면에 모든 정보를 욱여넣지 않고 스크롤로 천천히 본다.
 
 병합 컨트롤에서 사용자가 복수 인물을 1인으로 합치면 `merge_requested`를 올리고(분석-후 N:1), Controller가 재집계·재정규화 후 `render`로 갱신한다. 하단 **[리포트 저장]**은 `save_report_requested`만 발행하며(메뉴 `파일>리포트 저장`과 동일 핸들러로 Controller가 연결), 실제 직렬화는 Model(ReportExporter)이 수행한다(INV-V1).
 
@@ -573,8 +573,9 @@ class BaseChartWidget(QWidget):
     ANIM_INTERVAL = 30                  # ms
 
     def __init__(self) -> None:
-        self.figure = Figure()
+        self.figure = Figure(tight_layout=True)
         self.canvas = Canvas(self.figure)
+        self.canvas.setMinimumWidth(10)         # 캔버스의 축소 제한 해제 (가변 폭 대응)
         self._anim_timer = QTimer(self)         # 메인 스레드 타이머 (INV-V3)
         self._frame = 0
         self._animating = False                 # True 동안 hover 비활성 (INV-V5)

@@ -50,6 +50,7 @@ Controller 레이어는 크게 전역 상태와 라우팅을 담당하는 `AppCo
   | :--- | :--- |
   | 기동 — 캐시 없음 | `show_submit()` |
   | 기동 — 캐시 단독 로드 성공 | 즉시 `show_result()` (NFR-2.4) |
+  | `analyze_clicked` (입력 데이터 없음, 기존 캐시 존재) | `show_result()` (캐시 로드, NFR-2.4 확장) |
   | `analyze_clicked` (가중치 합 100%) | `show_loading()` |
   | `completed` | `show_result()` |
   | `failed` | `show_submit()` + 오류 안내 |
@@ -69,7 +70,7 @@ Controller 레이어는 크게 전역 상태와 라우팅을 담당하는 `AppCo
   
       # --- 분석 흐름 ---
       def on_analyze_clicked(self, config: dict) -> None:
-          """SubmitScreen.analyze_clicked 수신 → show_loading() → start_analysis()"""
+          """SubmitScreen.analyze_clicked 수신 → 입력값이 없으면 캐시를 우선 확인하여 show_result(), 입력값이 있으면 show_loading() → start_analysis()"""
   
       def on_analysis_completed(self, scores: list['MemberScore']) -> None:
           """completed Signal 수신 → asdict 직렬화 → ResultScreen.render → show_result()"""
