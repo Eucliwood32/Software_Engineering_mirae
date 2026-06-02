@@ -97,18 +97,18 @@ class MemberScore:                      # FR-4.* 통합 결과
 ### 2.2 CappingScaler (FR-4.2)
 
 - **책임:** 단일 커밋의 비정상적 대량 추가(예: 자동 생성 코드 일괄 커밋, 보일러플레이트 투입)에 의한 지표 왜곡을 방지하기 위해 추가 라인 수를 상한치로 제한하고(Capping), 합산값에 로그 스케일을 적용한다.
-- **상수:** `CAPPING_THRESHOLD: int = 10000`
+- **상수:** `CAPPING_THRESHOLD: int = 50000`
 - **시그니처:**
   ```python
   class CappingScaler:
-      CAPPING_THRESHOLD: int = 10000
+      CAPPING_THRESHOLD: int = 50000
       def cap(self, additions: int) -> tuple[int, bool]:
-          """additions > 10000 → (10000, True). 그 외 (additions, False)."""
+          """additions > 50000 → (50000, True). 그 외 (additions, False)."""
       def log_scale(self, total: int) -> float:
           """math.log1p(total)."""
   ```
 - **알고리즘:**
-  - `cap()`: `additions > CAPPING_THRESHOLD`이면 `(10000, True)`, 그렇지 않으면 `(additions, False)`. 경계값 `10000`은 Capping을 발동시키지 않는다 (`>`만 cap).
+  - `cap()`: `additions > CAPPING_THRESHOLD`이면 `(50000, True)`, 그렇지 않으면 `(additions, False)`. 경계값 `50000`은 Capping을 발동시키지 않는다 (`>`만 cap).
   - `log_scale()`: `math.log1p(total)`을 반환한다. `total == 0`이면 `0.0`.
 - **신호 연동:** Capping이 발생한 커밋은 `ContributionAggregator`를 통해 `MemberScore.capping_applied = True`로 기록되며, 조장에게 신호 목록(작성자·커밋 식별·변경량)으로 표시된다 (ConOps SC-A 8단계, SC-B 1단계).
 
@@ -124,7 +124,7 @@ class MemberScore:                      # FR-4.* 통합 결과
           """작성자 단기 커밋 빈도가 평소 일평균의 3배 초과 구간을 신호로.
              반환: [{author, period, period_commits, baseline_avg}, ...]"""
       def detect_capping(self, repo: dict[str, CommitStats]) -> list[dict]:
-          """단일 커밋 추가 라인 > 10000인 커밋을 신호로(해시 7자 축약).
+          """단일 커밋 추가 라인 > 50000인 커밋을 신호로(해시 7자 축약).
              반환: [{author, hash, date, additions}, ...]"""
       def detect_zscore(self, scores: list[MemberScore]) -> list[str]:
           """정규화 지표 Z-Score ≤ -1.5가 2개 이상인 팀원명 리스트."""
@@ -137,7 +137,7 @@ class MemberScore:                      # FR-4.* 통합 결과
   ```
 - **알고리즘:**
   - `detect_frequency()` (EW-02, FR-4.2b): 작성자별 일자별 커밋 시계열을 구성하여, 특정 일자의 커밋 수가 해당 작성자의 일평균 커밋 수의 3배를 초과하는 구간을 식별한다. 각 신호 항목은 `author`, `period`, `period_commits`, `baseline_avg`를 포함한다.
-  - `detect_capping()` (FR-4.2): `CommitStats.commits_list`를 순회하여 단일 커밋 추가 라인이 10,000을 초과하는 커밋을 신호 항목(작성자·커밋 해시 7자·작성일·변경 라인 수)으로 반환한다. (`commits_list`가 비어 있으면 빈 목록 — GitAnalyzer가 커밋 명세를 채워야 동작하며, `model-parser-design.md` 참조.)
+  - `detect_capping()` (FR-4.2): `CommitStats.commits_list`를 순회하여 단일 커밋 추가 라인이 50,000을 초과하는 커밋을 신호 항목(작성자·커밋 해시 7자·작성일·변경 라인 수)으로 반환한다. (`commits_list`가 비어 있으면 빈 목록 — GitAnalyzer가 커밋 명세를 채워야 동작하며, `model-parser-design.md` 참조.)
   - `detect_zscore()` / `detect_zscore_detail()` (FR-4.2d): 정규화된 지표(Git, 문서, 메신저)에 대해 팀원별 Z-Score를 산출하고, Z-Score가 -1.5 이하인 항목이 2개 이상 존재하는 팀원을 식별한다. `detect_zscore`는 이름 리스트를, `detect_zscore_detail`은 해당 팀원의 하위 지표명(`metrics`)을 함께 반환한다. 신호 대상 팀원은 산점도(FR-5.1c)에서 ⚠ 오버레이로 강조 표시된다.
   - `build_signal_details()`: 위 탐지 결과를 `MemberScore.signal_details` 스키마(§1.4)로 통합하여 팀원별로 묶는다. CAPPING·EW-02·ZSCORE 세 유형을 단일 구조로 합치며, 신호 카드 패널(`AnomalySignalPanel`, view-design)과 예외 처리(`NormalizedSignalsTracker`, §2.10)의 입력이 된다.
 - **격리 원칙:** 이 클래스의 출력은 `MemberScore.signals`/`signal_details`에 기록되지만, `total_score` 계산 경로에는 투입되지 않는다.
@@ -427,4 +427,4 @@ msgs: {author: count} ──┤                   │         │
 | v1.4 | 2026-06-01 | 사용자 피드백(UI/UX 개선) 반영: (1) §1.4 MemberScore 데이터 클래스에 시각화 툴팁 노출용 원시 데이터 필드(raw_additions, raw_chars, raw_messages) 추가. (2) §2.4 WeightPresetManager에 UI 가중치 실시간 비례 연동 및 텍스트 수치 표기를 지원하기 위한 redistribute 메서드의 UI 연동 책임 명시. | QCE 개발팀 |
 | **v1.5** | **2026-06-01** | **사용자 피드백(슬라이더 비례 분배 버그·표기 개선) 반영: (1) §2.4 WeightPresetManager `redistribute` 알고리즘 설명에 "나머지 두 축이 같은 비율로 증감"하는 동작을 명확히 기술(최댓값 축만 우선 줄어드는 기존 동작 교정). (2) 가중치 UI 표기 단위를 소수(1.00) 기준에서 퍼센트(100%) 기준으로 변경 — 프리셋 표, validate_sum, 합계 라벨, 경고 문구 포함.** | QCE 개발팀 |
 | **v1.6** | **2026-06-01** | **버그 수정(차트 합계 불일치) 반영: §2.7 ContributionAggregator의 파이프라인 7번(종합 점수 산출)에, 팀 전체의 기여도 합계가 항상 1.0(100%)이 되도록 최종적으로 비례 정규화하는 단계를 추가 명시.** | QCE 개발팀 |
-| **v1.7** | **2026-06-02** | **Capping 한도 상향 반영: §2.2 CappingScaler 및 §2.3 AnomalySignalDetector의 단일 커밋 추가 라인 임계값(CAPPING_THRESHOLD)을 1,000에서 10,000으로 대폭 상향.** | 이대한, 김휘중 공동 작업 |
+| **v1.7** | **2026-06-02** | **Capping 한도 상향 반영: §2.2 CappingScaler 및 §2.3 AnomalySignalDetector의 단일 커밋 추가 라인 임계값(CAPPING_THRESHOLD)을 1,000에서 50,000으로 대폭 상향.** | 이대한, 김휘중 공동 작업 |

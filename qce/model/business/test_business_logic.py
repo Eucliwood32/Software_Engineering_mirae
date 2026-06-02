@@ -91,16 +91,16 @@ class TestCappingScaler:
         self.cs = CappingScaler()
 
     def test_cap_over_threshold(self):
-        assert self.cs.cap(15000) == (10000, True)
+        assert self.cs.cap(60000) == (600000, True)
 
     def test_cap_under_threshold(self):
         assert self.cs.cap(9999) == (9999, False)
 
     def test_cap_at_boundary(self):
-        assert self.cs.cap(10000) == (10000, False)
+        assert self.cs.cap(600000) == (600000, False)
 
     def test_cap_just_above_boundary(self):
-        assert self.cs.cap(10001) == (10000, True)
+        assert self.cs.cap(600001) == (600000, True)
 
     def test_log_scale_zero(self):
         assert self.cs.log_scale(0) == 0.0
@@ -342,7 +342,7 @@ class TestContributionAggregator:
             assert 0.0 <= s.total_score <= 1.0
 
     def test_capping_applied_flag(self):
-        git = {"A": CommitStats(1, 5000, 0, [{"hash": "abcdefg", "date": "2026-01-01", "additions": 5000}])}
+        git = {"A": CommitStats(1, 60000, 0, [{"hash": "abcdefg", "date": "2026-01-01", "additions": 60000}])}
         docs = {"A": 100}
         msgs = {"A": 5}
         weights = {"git": 0.4, "doc": 0.4, "msg": 0.2}

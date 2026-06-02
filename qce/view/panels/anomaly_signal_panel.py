@@ -55,7 +55,7 @@ def _describe(author: str, detail: dict) -> str:
         return (
             f"{author}  ·  커밋 {detail.get('hash', '?')}  ·  "
             f"{detail.get('date', '')}  ·  +{detail.get('additions', 0):,}줄"
-            f"  (10,000줄 초과 → 캡핑)"
+            f"  (50,000줄 초과 → 캡핑)"
         )
     if t == "EW-02":
         return (

@@ -139,7 +139,7 @@ class ParseResult:                      # FR-3.2 — MessengerParser 출력
 - **이상 신호용 커밋 상세 (구현됨):** AnomalySignalDetector(FR-4.2 커밋별 Capping·FR-4.2b 빈도 신호)와 타임라인 시각화가 **커밋별 일자·변경량 시계열**을 필요로 하므로, `analyze()`는 작성자별 합계에 더해 **커밋 상세 리스트** `commits_list = [{hash, date, additions, deletions}, ...]`를 함께 채운다. 헤더 라인에서 새 커밋 레코드를 push하고 후속 numstat 라인이 그 레코드에 누적된다. 집계 합계는 상세 리스트로부터 결정론적으로 재현된다. (이전 버전은 합계만 채워 FR-4.2/4.2b 로직이 휴면 상태였으며, 본 보강으로 활성화됨.)
 - **예외·방어 처리:**
   - `CalledProcessError`(비-저장소 경로 등), `FileNotFoundError`(`git` 미설치), `TimeoutExpired`(30초 초과), `OSError`는 모두 흡수하여 **빈 dict(`{}`)를 반환**한다 (FR-2.1 "잘못된 경로 → 빈 결과, 예외 없음").
-  - 타임아웃 30초는 10,000커밋 저장소를 30초 이내 수집해야 한다는 성능 수용기준(FR-2.1 AC-3)과 정렬된다.
+  - 타임아웃 30초는 50,000커밋 저장소를 30초 이내 수집해야 한다는 성능 수용기준(FR-2.1 AC-3)과 정렬된다.
 - **추적:** FR-2.1. 제약 C-9(Git CLI 의존성 대응), C-5. Spec `02-git-pipeline.md` AC-1~AC-3.
 
 ---

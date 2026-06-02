@@ -315,7 +315,7 @@ class Normalizer:                       # FR-4.1
         """(x-min)/(max-min). max==min이면 전원 0.5. round(_, 4)."""
 
 class CappingScaler:                    # FR-4.2
-    CAPPING_THRESHOLD: int = 10000
+    CAPPING_THRESHOLD: int = 50000
     def cap(self, additions: int) -> tuple[int, bool]:
         """반환 (capped_value, capping_applied)."""
     def log_scale(self, total: int) -> float: ...

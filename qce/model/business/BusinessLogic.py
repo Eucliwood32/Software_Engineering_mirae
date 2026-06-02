@@ -126,7 +126,7 @@ class AnomalySignalDetector:
         return signals
 
     def detect_capping(self, repo: Dict[str, CommitStats]) -> List[dict]:
-        """FR-4.2: 단일 커밋 추가 라인 > 10000인 커밋을 신호로."""
+        """FR-4.2: 단일 커밋 추가 라인 > 50000인 커밋을 신호로."""
         signals = []
         for author, stats in repo.items():
             for c in stats.commits_list:
