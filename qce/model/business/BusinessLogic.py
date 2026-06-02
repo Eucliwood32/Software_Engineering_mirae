@@ -77,11 +77,11 @@ class Normalizer:
 
 class CappingScaler:
     """FR-4.2: 비정상적 대량 추가에 의한 지표 왜곡 방지 (상한 제한 및 로그 스케일링)"""
-    CAPPING_THRESHOLD: int = 10000
+    CAPPING_THRESHOLD: int = 50000
 
     def cap(self, additions: int) -> Tuple[int, bool]:
         if additions > self.CAPPING_THRESHOLD:
-            return (10000, True)
+            return (self.CAPPING_THRESHOLD, True)
         return (additions, False)
 
     def log_scale(self, total: int) -> float:
