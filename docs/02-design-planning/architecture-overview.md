@@ -315,7 +315,7 @@ class Normalizer:                       # FR-4.1
         """(x-min)/(max-min). max==min이면 전원 0.5. round(_, 4)."""
 
 class CappingScaler:                    # FR-4.2
-    CAPPING_THRESHOLD: int = 1000
+    CAPPING_THRESHOLD: int = 10000
     def cap(self, additions: int) -> tuple[int, bool]:
         """반환 (capped_value, capping_applied)."""
     def log_scale(self, total: int) -> float: ...
@@ -572,3 +572,4 @@ stateDiagram-v2
 | **v1.3** | **2026-05-31** | **구 SRS.md 폐지에 따른 정합화 및 구현분(A1~A4) 반영. (1) 상위 문서 참조에서 폐지된 SRS v2.2 제거, RR v1.5로 갱신. (2) §5.1 공용 타입을 실제 코드와 일치화: `CommitStats.commits_list` 추가, MemberScore 필드명 정정(`raw_chars`·`raw_messages`·`signals`) 및 `signal_details`·`commit_dates` 추가. (3) §4.2 컴포넌트 표·§5 시그니처·§9 RTM에 NormalizedSignalsTracker(FR-4.2c 예외)·AliasExtractor(FR-1.3) 추가, AnomalySignalDetector에 detect_capping/detect_zscore_detail/build_signal_details, WeightPresetManager에 redistribute 반영, AnomalySignalDetector 실현 FR에 FR-4.2·FR-4.2d 명시(번호 체계: 4.2c=예외·4.2d=Z-Score, RR v1.5 정합). 상세는 model-business-logic-design v1.3·view-design v1.4 참조.** | QCE 개발팀 |
 | v1.4 | 2026-06-01 | 사용자 피드백(UI/UX 개선 및 버그 수정) 반영: AppController 세션 초기화 메서드(reset_session), SubmitScreen 입력 초기화(clear_inputs) 및 파일명("없음" 포함) 노출 추가, AnalysisPanel 실시간 연동/수치 표기/가이드 문구 추가, ResultScreen 매핑 방어 로직 명시, BaseChartWidget placeholder 텍스트 갱신, 차트 위젯 원시 데이터(Raw Data) 노출 추가 명문화. | QCE 개발팀 |
 | **v1.5** | **2026-06-02** | **사용자 피드백 반영(산점도 시각화 개선): 3개 소스 입력 시 산점도의 세 번째 데이터 크기(Z축)를 단순 투명도(채도) 조절에서 색상 그라데이션 보간 방식으로 변경 명시.** | QCE 개발팀 |
+| **v1.6** | **2026-06-02** | **Capping 한도 상향 및 전역 UI 개선 동기화.** | 이대한, 김휘중 공동 작업 |
