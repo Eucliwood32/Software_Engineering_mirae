@@ -154,7 +154,7 @@ class GitHealthChecker:                      # FR-2.2
 | TC-FR-2.1-02 | P0 | L1 | 존재하지 않는 경로 문자열 | `{}`, 예외 없음 | 잘못된 경로 |
 | TC-FR-2.1-03 | P1 | L1 | 빈 디렉토리(git init 안 함) | `{}`, 예외 없음 | FileNotFoundError류 흡수 |
 | TC-FR-2.1-04 | P1 | L1 | 2명 author 혼합 커밋 | author별 분리 집계 | 멀티 author |
-| TC-FR-2.1-05 | P2 | L1 | 10,000 커밋 repo | 30초 이내 완료(timeout 미발동) | 성능 |
+| TC-FR-2.1-05 | P2 | L1 | 50,000 커밋 repo | 30초 이내 완료(timeout 미발동) | 성능 |
 | TC-FR-2.1-06 | P1 | L1 | timeout 강제(Mock subprocess `TimeoutExpired`) | `{}` 반환, 비정상 종료 없음 | 타임아웃 처리 |
 
 ```python
@@ -344,23 +344,23 @@ def test_normalize(inp, exp):
 ### 계약
 ```python
 class CappingScaler:                        # FR-4.2
-    CAPPING_THRESHOLD: int = 10000
+    CAPPING_THRESHOLD: int = 50000
     def cap(self, additions: int) -> tuple[int, bool]:
-        """additions>10000 → (10000, True). 그 외 (additions, False)."""
+        """additions>50000 → (50000, True). 그 외 (additions, False)."""
     def log_scale(self, total: int) -> float:   # math.log1p
 ```
 
 | TC-ID | P | L | 입력 | 기대 | 근거 |
 | :-- | :- | :- | :-- | :-- | :-- |
-| TC-FR-4.2-01 | P0 | L1 | `cap(15000)` | `(10000, True)` | 상한 |
+| TC-FR-4.2-01 | P0 | L1 | `cap(60000)` | `(50000, True)` | 상한 |
 | TC-FR-4.2-02 | P0 | L1 | `cap(9999)` | `(9999, False)` | 미발동 |
-| TC-FR-4.2-03 | P0 | L1 | `cap(10000)` | `(10000, False)` (경계: `>`만 cap) | 경계 |
-| TC-FR-4.2-04 | P0 | L1 | `cap(10001)` | `(10000, True)` | 경계 직상 |
+| TC-FR-4.2-03 | P0 | L1 | `cap(50000)` | `(50000, False)` (경계: `>`만 cap) | 경계 |
+| TC-FR-4.2-04 | P0 | L1 | `cap(50001)` | `(50000, True)` | 경계 직상 |
 | TC-FR-4.2-05 | P1 | L1 | `log_scale(0)` | `0.0` (`log1p(0)`) | 로그 |
-| TC-FR-4.2-06 | P0 | L1 | 15000줄 단일 커밋 포함 집계 | 내부 집계 기여분 10000으로 제한 + `capping_applied`/플래그 True | EW-01 |
+| TC-FR-4.2-06 | P0 | L1 | 60000줄 단일 커밋 포함 집계 | 내부 집계 기여분 50000으로 제한 + `capping_applied`/플래그 True | EW-01 |
 | TC-FR-4.2-07 | P0 | L2 | Capping 발생 커밋 존재 | 신호 목록에 작성자·커밋 식별·변경량 포함 | 신호 표시 |
 | TC-FR-4.2-08 | P0 | L1 | `detect_capping(repo)` — 12500줄 커밋 1 + 10줄 커밋 1 | 신호 1건, `{author, hash(7자), date, additions=12500}` | 커밋별 탐지 |
-| TC-FR-4.2-09 | P1 | L1 | `detect_capping` — 10000줄 커밋(경계) | 신호 0건(`>`만) | 경계 |
+| TC-FR-4.2-09 | P1 | L1 | `detect_capping` — 50000줄 커밋(경계) | 신호 0건(`>`만) | 경계 |
 
 ## FR-4.2b 비정상 빈도 신호 (EW-02)
 
@@ -371,7 +371,7 @@ class AnomalySignalDetector:                # FR-4.2, FR-4.2b, FR-4.2d
         """작성자 단기 커밋 빈도가 평소 일평균의 3배 초과 구간을 신호로.
            각 항목: {author, period, period_commits, baseline_avg}. (FR-4.2b)"""
     def detect_capping(self, repo: dict[str, CommitStats]) -> list[dict]:
-        """단일 커밋 추가>10000인 커밋. 각 항목: {author, hash(7), date, additions}. (FR-4.2)"""
+        """단일 커밋 추가>50000인 커밋. 각 항목: {author, hash(7), date, additions}. (FR-4.2)"""
     def detect_zscore(self, scores: list[MemberScore]) -> list[str]:
         """정규화 지표 Z-Score ≤ -1.5 가 2개 이상인 팀원명 리스트. (FR-4.2d)"""
     def build_signal_details(self, repo, scores) -> dict[str, list[dict]]:
@@ -1031,8 +1031,8 @@ def test_isolation_one_module_fails(monkeypatch):          # TC-NFR-3.2-03
 
 | 버전 | 일자 | 변경 | 작성자 |
 | :--- | :--- | :--- | :--- |
-| v1.0 | 2026-05-29 | 최초 작성. 전 FR/NFR에 대한 실행 가능 케이스, 계약 블록, pytest 스켈레톤, 12개 차트 게이트, 수동 체크리스트, 미커버 점검 포함. RR v1.3 기준(슬랙 제외·3종 차트·FR-4.2d 통일). | QCE 개발팀 |
+|v1.0|2026-05-29|최초 작성. 전 FR/NFR에 대한 실행 가능 케이스, 계약 블록, pytest 스켈레톤, 12개 차트 게이트, 수동 체크리스트, 미커버 점검 포함. RR v1.3 기준(슬랙 제외·3종 차트·FR-4.2d 통일).| 이대한 |
 | **v1.1** | **2026-05-31** | **RR v1.4·view-design v1.3 동기화: FR-5.4(3-스크린 네비게이션)·FR-5.5(제출 화면)·FR-5.6(로딩 화면)·FR-5.7(결과 화면 계정 병합 재집계) 케이스 신설. FR-5.7은 View(L3) + 재집계 경로(Controller+Model, L2)로 분리. 부록 B 미커버 점검 목록에 5.4~5.7 추가.** | QCE 개발팀 (이대한) |
-| **v1.2** | **2026-05-31** | **구 SRS.md 폐지 반영(A1~A4). (1) **FR-4.2c 이상 신호 예외 처리 섹션 신설**(NormalizedSignalsTracker L1 + AnomalySignalPanel L3, TC-FR-4.2c-01~08). (2) FR-4.2d 헤더 "번호 정합" 노트를 확정 체계(4.2c=예외·4.2d=Z-Score)로 갱신. (3) FR-4.2에 `detect_capping` 케이스(TC-FR-4.2-08·09) 및 계약에 detect_capping/build_signal_details 추가. (4) FR-1.3에 AliasExtractor 케이스(TC-FR-1.3-06~09). (5) FR-4.4에 redistribute/normalize/match_preset 케이스(TC-FR-4.4-10~14). (6) 부록 B 미커버 목록에 4.2c 추가. 상위 문서 RR v1.5·Architecture v1.3로 갱신.** | QCE 개발팀 |
-| **v1.3** | **2026-06-01** | **RR v1.6·test-plan v1.3 사용자 피드백(11대 UI/UX 결함 및 기능 방어 요소) 반영. (1) FR-3.1에 카톡 단독 파이프라인(TC-FR-3.1-06) 및 매핑 식별자 100% 표출(TC-FR-3.1-07) 케이스·pytest 스켈레톤 추가. (2) FR-4.4 UI에 가중치 실시간 연동(TC-FR-4.4-15), 숫자 표시(TC-FR-4.4-16), "작업 종류 별 반영 비율" 헤더(TC-FR-4.4-17), 연동 일관성(TC-FR-4.4-18) 케이스·pytest 추가. (3) FR-5.1 placeholder 문구를 "분석할 데이터가 없습니다."로 변경(TC-FR-5.1-01). (4) FR-5.1a 툴팁에 원시값 구성요소 포함(TC-FR-5.1a-03 개정·TC-FR-5.1a-10 신설). (5) FR-5.4에 [새 분석] 입력 초기화(TC-FR-5.4-07·08)·pytest 추가. (6) FR-5.5에 입력 파일명/저장소명 표시(TC-FR-5.5-06~08), 미입력 시 "없음" 표시(TC-FR-5.5-09)·pytest 추가. (7) FR-5.7에 빈 매핑 OK 차단(TC-FR-5.7-07), Cancel 안전 처리(TC-FR-5.7-08), OK 활성 조건(TC-FR-5.7-09), Cancel 후 재사용(TC-FR-5.7-10)·pytest 추가. (8) 부록 A 수동 체크리스트에 아이콘·가중치 연동·placeholder·파일명 표시·입력 초기화·매핑 방어·카톡 단독 항목 추가, 시나리오 D(아이콘) 신설. (9) 부록 B 미커버 목록에 NFR-4.1 추가. 상위 문서 RR v1.6·test-plan v1.3으로 갱신.** | QCE 개발팀 |
-| **v1.4** | **2026-06-02** | **Capping 한도 상향 반영: FR-4.2의 단일 커밋 추가 라인 제한 기준을 1,000줄에서 10,000줄로 상향함에 따라 관련 테스트 케이스 수정.** | 이대한, 김휘중 공동 작업 |
+|**v1.2**|**2026-05-31**|**구 SRS.md 폐지 반영(A1~A4). (1) **FR-4.2c 이상 신호 예외 처리 섹션 신설**(NormalizedSignalsTracker L1 + AnomalySignalPanel L3, TC-FR-4.2c-01~08). (2) FR-4.2d 헤더 "번호 정합" 노트를 확정 체계(4.2c=예외·4.2d=Z-Score)로 갱신. (3) FR-4.2에 `detect_capping` 케이스(TC-FR-4.2-08·09) 및 계약에 detect_capping/build_signal_details 추가. (4) FR-1.3에 AliasExtractor 케이스(TC-FR-1.3-06~09). (5) FR-4.4에 redistribute/normalize/match_preset 케이스(TC-FR-4.4-10~14). (6) 부록 B 미커버 목록에 4.2c 추가. 상위 문서 RR v1.5·Architecture v1.3로 갱신.**| 이대한 |
+|**v1.3**|**2026-06-01**|**RR v1.6·test-plan v1.3 사용자 피드백(11대 UI/UX 결함 및 기능 방어 요소) 반영. (1) FR-3.1에 카톡 단독 파이프라인(TC-FR-3.1-06) 및 매핑 식별자 100% 표출(TC-FR-3.1-07) 케이스·pytest 스켈레톤 추가. (2) FR-4.4 UI에 가중치 실시간 연동(TC-FR-4.4-15), 숫자 표시(TC-FR-4.4-16), "작업 종류 별 반영 비율" 헤더(TC-FR-4.4-17), 연동 일관성(TC-FR-4.4-18) 케이스·pytest 추가. (3) FR-5.1 placeholder 문구를 "분석할 데이터가 없습니다."로 변경(TC-FR-5.1-01). (4) FR-5.1a 툴팁에 원시값 구성요소 포함(TC-FR-5.1a-03 개정·TC-FR-5.1a-10 신설). (5) FR-5.4에 [새 분석] 입력 초기화(TC-FR-5.4-07·08)·pytest 추가. (6) FR-5.5에 입력 파일명/저장소명 표시(TC-FR-5.5-06~08), 미입력 시 "없음" 표시(TC-FR-5.5-09)·pytest 추가. (7) FR-5.7에 빈 매핑 OK 차단(TC-FR-5.7-07), Cancel 안전 처리(TC-FR-5.7-08), OK 활성 조건(TC-FR-5.7-09), Cancel 후 재사용(TC-FR-5.7-10)·pytest 추가. (8) 부록 A 수동 체크리스트에 아이콘·가중치 연동·placeholder·파일명 표시·입력 초기화·매핑 방어·카톡 단독 항목 추가, 시나리오 D(아이콘) 신설. (9) 부록 B 미커버 목록에 NFR-4.1 추가. 상위 문서 RR v1.6·test-plan v1.3으로 갱신.**| 이대한 |
+| **v1.4** | **2026-06-02** | **Capping 한도 상향 반영: FR-4.2의 단일 커밋 추가 라인 제한 기준을 1,000줄에서 50,000줄로 상향함에 따라 관련 테스트 케이스 수정.** | 이대한, 김휘중 공동 작업 |
