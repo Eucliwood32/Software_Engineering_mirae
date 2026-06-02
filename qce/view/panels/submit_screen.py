@@ -30,7 +30,7 @@ from qce.view.style import tokens as T
 DOC_EXTS = {".pptx", ".docx", ".hwpx"}
 MSG_EXTS = {".txt"}
 
-_LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "QCE_Logo.png")
+_LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "QCE_Logo.png")
 _DESCRIPTION = "Git · 문서 · 메신저 기여를 한 번에 정량 분석합니다.\n과제물(또는 폴더)을 아래 영역에 끌어다 놓으세요."
 _DROP_HINT = (
     "여기에 문서(.pptx/.docx/.hwpx)·카카오톡(.txt)·폴더·Git 저장소를 끌어다 놓으세요\n"

@@ -35,6 +35,7 @@ class BaseChartWidget(QWidget):
         super().__init__()
         self.figure = Figure(figsize=(6.0, 4.5), tight_layout=True)
         self.canvas = Canvas(self.figure)
+        self.canvas.setMinimumWidth(10)  # 가변형 가로 길이: 캔버스가 화면에 맞춰 축소될 수 있게 제한 해제
         
         # [v2.0] 차트 위에서 휠 스크롤 시 부모 ScrollArea가 스크롤되도록 이벤트 무시 (요구사항 2)
         self.canvas.wheelEvent = lambda event: event.ignore()

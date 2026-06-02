@@ -408,12 +408,28 @@ class AppController:
             self._weights = model_weights
             panel.set_analyze_enabled(True)
             panel.set_weight_warning(None)
+        elif total == 0.0:
+            panel.set_analyze_enabled(False)
+            panel.set_weight_warning(None)
         else:
             panel.set_analyze_enabled(False)
             panel.set_weight_warning(f"가중치 합계가 100%여야 합니다 (현재 {round(total * 100)}%)")
 
     def _on_analyze_clicked(self) -> None:
         self.main_window.set_save_enabled(False)  # 로딩 중 비활성
+        
+        if not self._doc_paths and not self._git_path and not self._msg_path:
+            from qce.model.business.cache_manager import CacheManager
+            from qce.model.business.BusinessLogic import MemberScore
+            cache_mgr = CacheManager()
+            cached_data = cache_mgr.load()
+            if cached_data and "scores" in cached_data:
+                self._last_scores = [MemberScore(**s) for s in cached_data["scores"]]
+                self._render_results()
+                self.main_window.show_result()
+                self.main_window.set_save_enabled(True)
+                return
+
         config = {
             "doc_paths": self._doc_paths,
             "git_path": self._git_path,

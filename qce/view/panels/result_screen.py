@@ -73,9 +73,24 @@ class ResultScreen(QWidget):
         page_lyt.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         # 페이지 타이틀
+        title_lyt = QHBoxLayout()
+        title_lyt.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        title_lyt.setSpacing(T.SPACING_SM)
+
+        import os
+        from PyQt6.QtGui import QPixmap
+        logo_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "QCE_Logo.png")
+        logo_lbl = QLabel()
+        pix = QPixmap(logo_path)
+        if not pix.isNull():
+            logo_lbl.setPixmap(pix.scaledToHeight(32, Qt.TransformationMode.SmoothTransformation))
+            title_lyt.addWidget(logo_lbl)
+            
         title = QLabel("프로젝트 분석 결과")
         title.setObjectName("pageTitle")
-        page_lyt.addWidget(title)
+        title_lyt.addWidget(title)
+        
+        page_lyt.addLayout(title_lyt)
 
         content_lyt = QVBoxLayout()
         content_lyt.setSpacing(T.SPACING_SECTION * 2)
