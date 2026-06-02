@@ -69,3 +69,4 @@ python -m PyInstaller QCE_debug.spec --clean --noconfirm
 | 버전 | 일자 | 변경 | 작성자 |
 | :--- | :--- | :--- | :--- |
 | v1.0 | 2026-05-31 | 최초 작성. PyInstaller --onefile 빌드 절차, NumPy 2.x C-확장 보정, 배포/디버그 2종 산출물, 재현 명령·검증 절차 기록. | QCE 개발팀 |
+| **v1.1** | **2026-06-02** | **전역 문서 업데이트의 일환 (Capping 한도 상향 및 UI/UX 디자인 개선 변경사항 동기화).** | 이대한, 김휘중 공동 작업 |
