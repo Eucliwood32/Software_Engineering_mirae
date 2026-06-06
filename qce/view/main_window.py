@@ -28,6 +28,16 @@ from PyQt6.QtWidgets import QHBoxLayout, QWidget, QMenu
 
 _LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "QCE_Logo.png")
 
+# 자주 쓰는 대표 세로(portrait) 해상도 — QCE는 세로로 길게 펼칠 때 가장 보기 좋다.
+# (width, height) 오름차순. 사용자 화면에 가장 잘 맞는 항목만 '권장' 표시한다.
+_RESOLUTION_PRESETS: list[tuple[int, int]] = [
+    (600, 960),
+    (720, 1280),
+    (810, 1440),
+    (900, 1600),
+    (1080, 1920),
+]
+
 
 class MainWindow(QMainWindow):
     save_report_requested = pyqtSignal()
@@ -81,6 +91,18 @@ class MainWindow(QMainWindow):
         self.file_btn.setMenu(file_menu)
         left_layout.addWidget(self.file_btn)
 
+        # '파일' 버튼과 똑같이 생긴 '화면' 버튼 — 세로 해상도 프리셋 선택(FR-5.8 인접 기능)
+        self.screen_btn = QToolButton()
+        self.screen_btn.setText("화면")
+        self.screen_btn.setObjectName("secondary")
+        self.screen_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self._screen_menu = QMenu(self.screen_btn)
+        # 메뉴를 펼칠 때마다 현재 화면 기준으로 '권장' 표시를 다시 계산한다(모니터 이동 대응)
+        self._screen_menu.aboutToShow.connect(self._rebuild_screen_menu)
+        self.screen_btn.setMenu(self._screen_menu)
+        self._rebuild_screen_menu()
+        left_layout.addWidget(self.screen_btn)
+
         self.menuBar().setCornerWidget(left_widget, Qt.Corner.TopLeftCorner)
 
         # [v2.0] 우측 상단 끝 설정 버튼(코너 위젯, FR-5.8)
@@ -90,6 +112,51 @@ class MainWindow(QMainWindow):
         self.settings_btn.setAutoRaise(True)
         self.settings_btn.clicked.connect(self._open_settings)
         self.menuBar().setCornerWidget(self.settings_btn, Qt.Corner.TopRightCorner)
+
+    # ------------------------------------------------------------------ #
+    # 화면(해상도) 메뉴 — 세로 프리셋 + 사용자 화면 맞춤 '권장' 표시
+    # ------------------------------------------------------------------ #
+    def _recommended_resolution(self) -> tuple[int, int] | None:
+        """현재 화면에 가장 잘 어울리는 세로 프리셋을 고른다.
+
+        작업표시줄을 제외한 가용 영역(availableGeometry)과 창 프레임(타이틀바 등)을
+        고려해, '들어가는 것 중 가장 큰' 세로 해상도를 권장한다. 세로로 길수록 보기
+        좋은 앱이므로 높이를 최대화하는 쪽을 고른다. 하나도 안 들어가면 가장 작은 것.
+        """
+        screen = self.screen()
+        if screen is None:
+            return None
+        avail = screen.availableGeometry()
+        frame = self.frameGeometry().size() - self.size()  # 타이틀바·테두리 여백
+        max_w = avail.width() - max(frame.width(), 0)
+        max_h = avail.height() - max(frame.height(), 0)
+        fitting = [(w, h) for (w, h) in _RESOLUTION_PRESETS if w <= max_w and h <= max_h]
+        if fitting:
+            return max(fitting, key=lambda wh: wh[1])  # 들어가는 것 중 가장 높이가 큰 것
+        return _RESOLUTION_PRESETS[0]
+
+    def _rebuild_screen_menu(self) -> None:
+        """세로 해상도 액션을 (재)구성한다. 권장 항목에만 '(권장)' 꼬리표를 단다."""
+        self._screen_menu.clear()
+        recommended = self._recommended_resolution()
+        for w, h in _RESOLUTION_PRESETS:
+            label = f"{w} × {h}"
+            if (w, h) == recommended:
+                label += "  (권장)"
+            act = self._screen_menu.addAction(label)
+            act.triggered.connect(lambda _checked=False, w=w, h=h: self._apply_resolution(w, h))
+
+    def _apply_resolution(self, w: int, h: int) -> None:
+        """창 크기를 프리셋으로 바꾸고 화면 중앙에 다시 배치한다."""
+        self.showNormal()  # 최대화 상태였다면 해제해야 resize가 반영된다
+        self.resize(w, h)
+        screen = self.screen()
+        if screen is not None:
+            center = screen.availableGeometry().center()
+            geo = self.frameGeometry()
+            geo.moveCenter(center)
+            self.move(geo.topLeft())
+        self.flash_status(f"화면 해상도를 {w} × {h}(으)로 변경했습니다.", 3000)
 
     def set_save_enabled(self, enabled: bool) -> None:
         """리포트 저장 메뉴 활성/비활성. 결과 화면+결과 존재 시에만 True."""
